@@ -208,10 +208,9 @@ export default function Home() {
         </header>
 
         {/* Viewport */}
-        <div className="flex-1 p-8 flex items-center justify-center bg-center relative group" style={{ backgroundImage: "url('/grid.svg')" }}>
+        <div className="flex-1 p-8 flex items-center justify-center bg-[#0f0f0f] relative group">
 
-          {/* Background pattern placeholder */}
-          <div className="absolute inset-0 opacity-5 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle, #333 1px, transparent 1px)', backgroundSize: '24px 24px' }}></div>
+          {/* Background pattern placeholder - Removed to fix build error */}
 
           {!image ? (
             <div className="text-center space-y-4 max-w-md">
