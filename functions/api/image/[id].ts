@@ -1,12 +1,12 @@
-export async function onRequest({ params, env }) {
+export const onRequest: PagesFunction = async ({ params }) => {
   return new Response(
     JSON.stringify({
       ok: true,
       id: params.id,
-      hasRunpodKey: !!env.RUNPOD_API_KEY,
+      runtime: "cloudflare-pages",
     }),
     {
       headers: { "content-type": "application/json" },
     }
   );
-}
+};
