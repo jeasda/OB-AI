@@ -208,7 +208,7 @@ export default function Home() {
         </header>
 
         {/* Viewport */}
-        <div className="flex-1 p-8 flex items-center justify-center bg-[url('/grid.svg')] bg-center relative group">
+        <div className="flex-1 p-8 flex items-center justify-center bg-center relative group" style={{ backgroundImage: "url('/grid.svg')" }}>
 
           {/* Background pattern placeholder */}
           <div className="absolute inset-0 opacity-5 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle, #333 1px, transparent 1px)', backgroundSize: '24px 24px' }}></div>
