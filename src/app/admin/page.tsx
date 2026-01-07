@@ -12,9 +12,10 @@ export default function AdminPage() {
         // Fetch current URL on load
         fetch('/api/config')
             .then(res => res.json())
-            .then(data => {
-                if (data.url) setCurrentUrl(data.url);
-            })
+            .then((data: any) => {
+  if (data?.url) setCurrentUrl(data.url);
+})
+
             .catch(err => console.error(err));
     }, []);
 
