@@ -1,12 +1,17 @@
-export const onRequest: PagesFunction = async ({ params }) => {
+import type { PagesFunction } from "@cloudflare/workers-types";
+
+export const onRequest: PagesFunction = async (context) => {
+  const { params } = context;
+
   return new Response(
     JSON.stringify({
       ok: true,
-      id: params.id,
-      runtime: "cloudflare-pages",
+      id: params?.id,
     }),
     {
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+      },
     }
   );
 };

@@ -17,6 +17,11 @@
       {
         "name": "next"
       }
+      {
+  "compilerOptions": {
+    "types": ["@cloudflare/workers-types"]
+  }
+}
     ],
     "paths": {
       "@/*": ["./src/*"]
