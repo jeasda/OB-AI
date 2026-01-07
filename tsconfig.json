@@ -17,4 +17,5 @@
     "**/*.tsx",
     "functions/**/*.ts"
   ],
-  "exclude
+  "exclude": ["node_modules"]
+}
