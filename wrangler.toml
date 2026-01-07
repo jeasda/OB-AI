@@ -1,6 +1,5 @@
 name = "obaistudio"
 compatibility_date = "2024-01-01"
-account_id = "3649a0b3c66e25b7632c50d0ce9e3faa"
 pages_build_output_dir = ".vercel/output/static"
 
 [[d1_databases]]
