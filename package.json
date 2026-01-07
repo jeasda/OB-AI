@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npx rimraf .next .vercel && next build",
     "start": "next start",
     "lint": "eslint",
     "pages:build": "npx rimraf .next && npx @cloudflare/next-on-pages",
