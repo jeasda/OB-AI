@@ -1,90 +1,145 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
-export default function AdminPage() {
-    const [url, setUrl] = useState('');
-    const [pin, setPin] = useState('');
-    const [status, setStatus] = useState('');
-    const [currentUrl, setCurrentUrl] = useState('');
+type QueueStatusResponse = {
+  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+  outputUrl?: string;
+  error?: string;
+};
 
-    useEffect(() => {
-        // Fetch current URL on load
-        fetch('/api/config')
-            .then(res => res.json())
-            .then((data: any) => {
-  if (data?.url) setCurrentUrl(data.url);
-})
+export default function Home() {
+  const [prompt, setPrompt] = useState('');
+  const [aspectRatio, setAspectRatio] = useState('1:1');
+  const [steps, setSteps] = useState('4');
+  const [cfg, setCfg] = useState(2.5);
+  const [negativePrompt, setNegativePrompt] = useState('');
+  const [image, setImage] = useState<string | null>(null);
+  const [sourceImage, setSourceImage] = useState<File | null>(null);
+  const [sourceImagePreview, setSourceImagePreview] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
 
-            .catch(err => console.error(err));
-    }, []);
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSourceImage(file);
+      setSourceImagePreview(URL.createObjectURL(file));
+    }
+  };
 
-    const handleSave = async () => {
-        setStatus('Saving...');
-        try {
-            const res = await fetch('/api/config', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url, pin })
-            });
+  const pollStatus = (jobId: string) => {
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/queue/status?jobId=${jobId}`);
+        if (!res.ok) throw new Error('Status fetch failed');
 
-            if (res.ok) {
-                setStatus('Saved! You can now use the app.');
-                setCurrentUrl(url);
-            } else {
-                const err = await res.text();
-                setStatus('Error: ' + err);
-            }
-        } catch (e: any) {
-            setStatus('Error: ' + e.message);
+        const data = (await res.json()) as QueueStatusResponse;
+
+        if (data.status === 'COMPLETED' && data.outputUrl) {
+          clearInterval(interval);
+          setImage(data.outputUrl);
+          setLoading(false);
+          setStatusMessage('Done!');
+        } else if (data.status === 'FAILED') {
+          clearInterval(interval);
+          setLoading(false);
+          setError(data.error || 'Generation failed');
+        } else {
+          setStatusMessage(`Status: ${data.status}...`);
         }
-    };
+      } catch {
+        clearInterval(interval);
+        setLoading(false);
+        setError('Polling failed');
+      }
+    }, 3000);
+  };
 
-    return (
-        <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-4">
-            <div className="max-w-md w-full bg-gray-900 p-8 rounded-xl border border-gray-800 space-y-6">
-                <h1 className="text-2xl font-bold text-yellow-500">Admin Configuration</h1>
+  const generateImage = async () => {
+    if (!prompt) return;
+    if (!sourceImage) {
+      setError('Please upload a source image');
+      return;
+    }
 
-                <div className="p-4 bg-gray-800 rounded-lg">
-                    <p className="text-xs text-gray-400 mb-1">Current Active Tunnel:</p>
-                    <p className="font-mono text-green-400 break-all">{currentUrl || 'Not set'}</p>
-                </div>
+    setLoading(true);
+    setError(null);
+    setImage(null);
+    setStatusMessage('Uploading image...');
 
-                <div className="space-y-2">
-                    <label className="text-sm font-semibold text-gray-300">New Tunnel URL</label>
-                    <input
-                        type="text"
-                        className="w-full bg-black border border-gray-700 rounded p-3 text-sm focus:border-yellow-500 outline-none"
-                        placeholder="https://xxxx.trycloudflare.com"
-                        value={url}
-                        onChange={(e) => setUrl(e.target.value)}
-                    />
-                </div>
+    try {
+      const formData = new FormData();
+      formData.append('file', sourceImage);
 
-                <div className="space-y-2">
-                    <label className="text-sm font-semibold text-gray-300">Admin PIN</label>
-                    <input
-                        type="password"
-                        className="w-full bg-black border border-gray-700 rounded p-3 text-sm focus:border-yellow-500 outline-none"
-                        placeholder="Enter PIN"
-                        value={pin}
-                        onChange={(e) => setPin(e.target.value)}
-                    />
-                </div>
+      const uploadRes = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
 
-                <button
-                    onClick={handleSave}
-                    className="w-full bg-yellow-600 hover:bg-yellow-500 text-black font-bold py-3 rounded transition-colors"
-                >
-                    Update System
-                </button>
+      const uploadData = (await uploadRes.json()) as {
+        success: boolean;
+        url?: string;
+        error?: string;
+      };
 
-                {status && (
-                    <p className={`text-center text-sm ${status.includes('Error') ? 'text-red-500' : 'text-green-500'}`}>
-                        {status}
-                    </p>
-                )}
-            </div>
+      if (!uploadData.success || !uploadData.url) {
+        throw new Error(uploadData.error || 'Upload failed');
+      }
+
+      const absoluteImageUrl = new URL(uploadData.url, window.location.origin).toString();
+
+      setStatusMessage('Queuing job...');
+
+      const queueRes = await fetch('/api/queue/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
+          imageUrl: absoluteImageUrl,
+          aspectRatio,
+          steps,
+          cfg,
+          negativePrompt,
+        }),
+      });
+
+      const queueData = (await queueRes.json()) as {
+        jobId: string;
+        error?: string;
+      };
+
+      if (queueData.error) throw new Error(queueData.error);
+
+      setStatusMessage('Waiting for GPU...');
+      pollStatus(queueData.jobId);
+
+    } catch (err: any) {
+      setError(err.message || 'Unexpected error');
+      setLoading(false);
+    }
+  };
+
+  return (
+    <main className="flex h-screen bg-[#0f0f0f] text-gray-200">
+      <button
+        onClick={generateImage}
+        disabled={loading}
+        className="m-auto px-6 py-3 bg-yellow-500 text-black rounded font-bold"
+      >
+        {loading ? statusMessage : 'Generate'}
+      </button>
+
+      {image && (
+        <img src={image} alt="Generated" className="absolute bottom-10 right-10 max-w-md rounded" />
+      )}
+
+      {error && (
+        <div className="absolute bottom-6 right-6 bg-red-600 text-white px-4 py-2 rounded">
+          {error}
         </div>
-    );
+      )}
+    </main>
+  );
 }
