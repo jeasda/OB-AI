@@ -1,5 +1,4 @@
 {
-  "extends": "next",
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["DOM", "DOM.Iterable", "ES2022"],
@@ -9,6 +8,7 @@
     "noEmit": true,
     "skipLibCheck": true,
     "incremental": true,
+    "jsx": "preserve",
     "types": ["@cloudflare/workers-types"]
   },
   "include": [
