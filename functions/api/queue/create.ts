@@ -5,7 +5,9 @@ type CreateQueueBody = {
   image_url?: string;
 };
 
-export const onRequestPost: PagesFunction = async ({ request, env }) => {
+export const onRequestPost: PagesFunction = async (context) => {
+  const { request, env } = context;
+
   try {
     // 1) parse body
     const body = (await request.json()) as CreateQueueBody;
@@ -21,20 +23,22 @@ export const onRequestPost: PagesFunction = async ({ request, env }) => {
     const jobId = crypto.randomUUID();
     const now = new Date().toISOString();
 
-    // 3) insert job to D1 (PENDING)
-    await env.DB.prepare(
+    // 3) insert job (PENDING)
+    await (env as any).DB.prepare(
       `
       INSERT INTO jobs (id, status, prompt, image_url, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?)
-    `
-    ).bind(
-      jobId,
-      "PENDING",
-      body.prompt,
-      body.image_url ?? null,
-      now,
-      now
-    ).run();
+      `
+    )
+      .bind(
+        jobId,
+        "PENDING",
+        body.prompt,
+        body.image_url ?? null,
+        now,
+        now
+      )
+      .run();
 
     // 4) call RunPod
     const runpodRes = await fetch(
@@ -63,17 +67,15 @@ export const onRequestPost: PagesFunction = async ({ request, env }) => {
     const runpodJobId = runpodJson.id;
 
     // 5) update job with runpod_job_id
-    await env.DB.prepare(
+    await (env as any).DB.prepare(
       `
       UPDATE jobs
       SET runpod_job_id = ?, updated_at = ?
       WHERE id = ?
-    `
-    ).bind(
-      runpodJobId,
-      new Date().toISOString(),
-      jobId
-    ).run();
+      `
+    )
+      .bind(runpodJobId, new Date().toISOString(), jobId)
+      .run();
 
     // 6) response
     return new Response(
