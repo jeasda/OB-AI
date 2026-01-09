@@ -1,7 +1,6 @@
 name = "obaistudio"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
-pages_build_output_dir = ".vercel/output/static"
 
 [[d1_databases]]
 binding = "DB"
@@ -11,8 +10,3 @@ database_id = "d4c9a2fb-0635-4fcb-bd48-e8faa1a6ae21"
 [[r2_buckets]]
 binding = "IMAGES_BUCKET"
 bucket_name = "obaistudio-assets"
-# preview_bucket_name = "obaistudio-assets-dev" # Optional: for local dev
-
-[vars]
-RUNPOD_API_KEY = "rpa_X1AWW1WQJXZG1C41768MY0PWB5MAXUTIDE6Z2SSP1fyh4w"
-RUNPOD_ENDPOINT_ID = "i3qcf6gz8v495h"
