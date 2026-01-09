@@ -4,6 +4,21 @@ import { Env } from '../env';
 
 export const runtime = 'edge';
 
+export async function GET(request: NextRequest) {
+    try {
+        const { env } = getRequestContext<Env>();
+        return NextResponse.json({
+            status: 'ok',
+            message: 'API is reachable',
+            envKeys: Object.keys(env),
+            hasBucket: !!env.IMAGES_BUCKET,
+            hasDB: !!env.DB
+        });
+    } catch (e: any) {
+        return NextResponse.json({ error: e.message }, { status: 500 });
+    }
+}
+
 export async function POST(request: NextRequest) {
     try {
         const formData = await request.formData();
