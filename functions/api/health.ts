@@ -1,4 +1,11 @@
-export const onRequestGet: PagesFunction = async ({ env }) => {
+interface Env {
+  RUNPOD_API_KEY: string;
+  RUNPOD_ENDPOINT_ID: string;
+  DB: D1Database;
+  IMAGES_BUCKET: R2Bucket;
+}
+
+export const onRequestGet: PagesFunction<Env> = async ({ env }) => {
   return new Response(
     JSON.stringify(
       {
