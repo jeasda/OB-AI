@@ -29,11 +29,11 @@ export async function POST(request: NextRequest) {
         // 2. Trigger RunPod (Fire and Forget or Await)
         // We await to ensure we get the RunPod ID, but we shouldn't block too long.
         const runpodRes = await fetch(
-            `https://api.runpod.ai/v2/${env.RUNPOD_ENDPOINT_ID}/run`,
+            `https://api.runpod.ai/v2/i3qcf6gz8v495h/run`,
             {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${env.RUNPOD_API_KEY}`,
+                    'Authorization': `Bearer cf6eacadee94dc87d68792e3b8f5188aa9c98`,
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({

@@ -14,5 +14,5 @@ bucket_name = "obaistudio-assets"
 # preview_bucket_name = "obaistudio-assets-dev" # Optional: for local dev
 
 [vars]
-RUNPOD_API_KEY = "SECRET_MANAGED_IN_DASHBOARD"
-RUNPOD_ENDPOINT_ID = "SECRET_MANAGED_IN_DASHBOARD"
+RUNPOD_API_KEY = "rpa_X1AWW1WQJXZG1C41768MY0PWB5MAXUTIDE6Z2SSP1fyh4w"
+RUNPOD_ENDPOINT_ID = "i3qcf6gz8v495h"

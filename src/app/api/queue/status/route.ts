@@ -34,10 +34,10 @@ export async function GET(request: NextRequest) {
         // 3. If PENDING/PROCESSING, Poll RunPod
         if (job.runpod_id) {
             const runpodRes = await fetch(
-                `https://api.runpod.ai/v2/${env.RUNPOD_ENDPOINT_ID}/status/${job.runpod_id}`,
+                `https://api.runpod.ai/v2/i3qcf6gz8v495h/status/${job.runpod_id}`,
                 {
                     headers: {
-                        'Authorization': `Bearer ${env.RUNPOD_API_KEY}`,
+                        'Authorization': `Bearer cf6eacadee94dc87d68792e3b8f5188aa9c98`,
                     },
                 }
             );
