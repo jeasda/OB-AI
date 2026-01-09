@@ -4,4 +4,5 @@ export interface Env {
     DB: D1Database;
     RUNPOD_API_KEY: string;
     RUNPOD_ENDPOINT_ID: string;
+    [key: string]: unknown;
 }

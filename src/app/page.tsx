@@ -28,7 +28,7 @@ export default function Home() {
     const interval = setInterval(async () => {
       try {
         const res = await fetch(`/api/queue/status?jobId=${jobId}`);
-        const data = await res.json();
+        const data = await res.json() as any;
 
         if (data.status === 'COMPLETED') {
           clearInterval(interval);
@@ -71,7 +71,7 @@ export default function Home() {
         method: 'POST',
         body: formData,
       });
-      const uploadData = await uploadRes.json();
+      const uploadData = await uploadRes.json() as any;
 
       if (!uploadData.success) {
         throw new Error(uploadData.error || 'Upload failed');
@@ -108,7 +108,7 @@ export default function Home() {
         }),
       });
 
-      const queueData = await queueRes.json();
+      const queueData = await queueRes.json() as any;
       if (queueData.error) throw new Error(queueData.error);
 
       setStatusMessage('Waiting for GPU...');

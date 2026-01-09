@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRequestContext } from '@cloudflare/next-on-pages';
+import { Env } from '../../env';
 
 export const runtime = 'edge';
 
@@ -11,7 +12,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Missing jobId' }, { status: 400 });
     }
 
-    const { env } = getRequestContext();
+    const { env } = getRequestContext<Env>();
 
     try {
         // 1. Query D1
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest) {
             );
 
             if (runpodRes.ok) {
-                const runpodData = await runpodRes.json();
+                const runpodData = await runpodRes.json() as any;
                 const rpStatus = runpodData.status; // COMPLETED, FAILED, IN_QUEUE, IN_PROGRESS
 
                 let newStatus = job.status;

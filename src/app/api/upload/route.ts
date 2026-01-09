@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { v4 as uuidv4 } from 'uuid';
+import { Env } from '../env';
 
 export const runtime = 'edge';
 
@@ -13,7 +14,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ success: false, error: 'No file uploaded' }, { status: 400 });
         }
 
-        const { env } = getRequestContext();
+        const { env } = getRequestContext<Env>();
         const imageId = uuidv4();
         const r2Key = `uploads/${imageId}-${file.name}`;
 

@@ -1,18 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { v4 as uuidv4 } from 'uuid';
+import { Env } from '../../env';
 
 export const runtime = 'edge';
 
 export async function POST(request: NextRequest) {
     try {
-        const { prompt, imageUrl } = await request.json();
+        const body = await request.json() as { prompt?: string; imageUrl?: string };
+        const { prompt, imageUrl } = body;
 
         if (!prompt || !imageUrl) {
             return NextResponse.json({ error: 'Missing prompt or imageUrl' }, { status: 400 });
         }
 
-        const { env } = getRequestContext();
+        const { env } = getRequestContext<Env>();
         const jobId = uuidv4();
 
         // 1. Insert into D1 (PENDING)
@@ -48,7 +50,7 @@ export async function POST(request: NextRequest) {
             throw new Error(`RunPod Error: ${runpodRes.status} ${errText}`);
         }
 
-        const runpodData = await runpodRes.json();
+        const runpodData = await runpodRes.json() as any;
         const runpodId = runpodData.id;
 
         // 3. Update D1 with RunPod ID
