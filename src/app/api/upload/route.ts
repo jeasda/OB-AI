@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRequestContext } from '@cloudflare/next-on-pages';
-import { v4 as uuidv4 } from 'uuid';
 import { Env } from '../env';
 
 export const runtime = 'edge';
@@ -15,7 +14,14 @@ export async function POST(request: NextRequest) {
         }
 
         const { env } = getRequestContext<Env>();
-        const imageId = uuidv4();
+
+        // Debugging: Check Binding
+        if (!env.IMAGES_BUCKET) {
+            console.error('Critical: IMAGES_BUCKET binding is missing in env!');
+            return NextResponse.json({ success: false, error: 'Server Config Error: R2 Binding (IMAGES_BUCKET) missing' }, { status: 500 });
+        }
+
+        const imageId = crypto.randomUUID();
         const r2Key = `uploads/${imageId}-${file.name}`;
 
         // Upload to R2

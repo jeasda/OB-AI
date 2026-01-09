@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRequestContext } from '@cloudflare/next-on-pages';
-import { v4 as uuidv4 } from 'uuid';
 import { Env } from '../../env';
 
 export const runtime = 'edge';
@@ -15,7 +14,12 @@ export async function POST(request: NextRequest) {
         }
 
         const { env } = getRequestContext<Env>();
-        const jobId = uuidv4();
+
+        if (!env.DB) {
+            return NextResponse.json({ error: 'Server Config Error: D1 Binding (DB) missing' }, { status: 500 });
+        }
+
+        const jobId = crypto.randomUUID();
 
         // 1. Insert into D1 (PENDING)
         await env.DB.prepare(
