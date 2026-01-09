@@ -1,15 +1,11 @@
-export async function onRequest({ env }: { env: any }) {
+export const onRequestGet: PagesFunction = async ({ env }) => {
   return new Response(
     JSON.stringify({
-      ok: true,
       hasRunpodKey: !!env.RUNPOD_API_KEY,
-      hasEndpointId: !!env.RUNPOD_ENDPOINT_ID,
-      endpointIdPreview: env.RUNPOD_ENDPOINT_ID
-        ? env.RUNPOD_ENDPOINT_ID.slice(0, 4) + '***'
-        : null,
-    }),
-    {
-      headers: { 'Content-Type': 'application/json' },
-    }
-  );
+      endpoint: env.RUNPOD_ENDPOINT_ID ? "OK" : "MISSING",
+      d1: !!env.DB,
+      r2: !!env.IMAGES_BUCKET,
+    }, null, 2),
+    { headers: { "content-type": "application/json" } }
+  )
 }
