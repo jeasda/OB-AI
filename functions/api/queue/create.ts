@@ -1,21 +1,22 @@
-export async function onRequest({ request }: { request: Request }) {
-  if (request.method !== "POST") {
-    return new Response("Method Not Allowed", { status: 405 });
-  }
-
+export async function onRequestPost({ request, env }: any) {
   const body = await request.json();
+
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+
+  await env.DB.prepare(
+    `INSERT INTO queue (id, prompt, model, status, created_at)
+     VALUES (?, ?, ?, ?, ?)`
+  )
+    .bind(id, body.prompt, body.model, "queued", now)
+    .run();
 
   return new Response(
     JSON.stringify({
       ok: true,
-      message: "queue created",
-      input: body,
-      model: body.model,
+      id,
+      status: "queued",
     }),
-    {
-      headers: {
-        "content-type": "application/json",
-      },
-    }
+    { headers: { "content-type": "application/json" } }
   );
 }
