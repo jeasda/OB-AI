@@ -1,15 +1,13 @@
-export async function onRequestPost({ request }: any) {
+export async function onRequestPost({ request }: { request: Request }) {
   const body = await request.json();
 
   return new Response(
     JSON.stringify({
       ok: true,
-      received: body,
+      received: body
     }),
     {
-      headers: {
-        "content-type": "application/json",
-      },
+      headers: { "content-type": "application/json" }
     }
   );
 }
