@@ -1,6 +1,6 @@
-import type { PagesFunction } from "@cloudflare/workers-types";
+export async function onRequestPost(context: any) {
+  const { request } = context;
 
-export const onRequestPost: PagesFunction = async ({ request }) => {
   const body = await request.json();
 
   return new Response(
@@ -14,4 +14,4 @@ export const onRequestPost: PagesFunction = async ({ request }) => {
       },
     }
   );
-};
+}
