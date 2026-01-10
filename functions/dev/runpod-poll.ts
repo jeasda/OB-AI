@@ -1,8 +1,9 @@
 import { pollRunpod } from "../worker/runpod/poll";
 
-export const onRequestPost: PagesFunction = async ({ env }) => {
+export const onRequestPost = async ({ env }: any) => {
   const result = await pollRunpod(env);
-  return new Response(JSON.stringify({ ok: true, result }), {
+
+  return new Response(JSON.stringify(result), {
     headers: { "content-type": "application/json" },
   });
 };
