@@ -1,17 +1,14 @@
-export const onRequestPost = async (context: any) => {
+export async function onRequestPost({ request, env }: any) {
   try {
-    const { request, env } = context;
-
     const body = await request.json();
 
-    // ตัวอย่าง response ชั่วคราว (ไว้เช็ค deploy)
     return new Response(
       JSON.stringify({
-        status: "ok",
-        message: "queue created",
-        body,
-      }, null, 2),
+        ok: true,
+        received: body,
+      }),
       {
+        status: 200,
         headers: {
           "content-type": "application/json",
         },
@@ -20,10 +17,15 @@ export const onRequestPost = async (context: any) => {
   } catch (err: any) {
     return new Response(
       JSON.stringify({
-        status: "error",
-        message: err?.message ?? "unknown error",
-      }, null, 2),
-      { status: 500 }
+        ok: false,
+        error: err?.message ?? "unknown error",
+      }),
+      {
+        status: 500,
+        headers: {
+          "content-type": "application/json",
+        },
+      }
     );
   }
-};
+}
