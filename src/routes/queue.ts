@@ -141,27 +141,9 @@ export async function handleQueueCreate(request: Request, env: Env, ctx: Executi
         if (workflow["3"]?.inputs) workflow["3"].inputs.seed = seed;
         if (workflow["340"]?.inputs) workflow["340"].inputs.seed = seed;
 
-        // Construct Payload
-        const payload = {
-          input: {
-            workflow: workflow,
-            images: [
-              {
-                name: INPUT_IMAGE_NAME,
-                url: imageUrl
-              }
-            ]
-          }
-        };
-
-        // Note: runpodSubmitJob handles the wrapping of 'input' key? 
-        // Wait, src/services/runpod.ts wraps 'input' => body: { input: input }.
-        // So here we should pass the INNER object.
-        // If we want body: { input: { workflow: ..., images: ... } }
-        // Then runpodSubmitJob arg 'input' should be { workflow: ..., images: ... }
-
+        // Construct Payload (Use 'prompt' key for API format)
         const finalPayload = {
-          workflow: workflow,
+          prompt: workflow,
           images: [
             {
               name: INPUT_IMAGE_NAME,

@@ -34,6 +34,7 @@ export async function runpodSubmitJob(
 
   if (!res.ok) {
     const text = await res.text();
+    console.error(`[RunPod Error] Status: ${res.status}, Body: ${text}`);
     throw new Error(`RunPod submit failed (${res.status}): ${text}`);
   }
 
