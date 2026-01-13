@@ -1,46 +1,46 @@
 // src/services/runpod.service.ts
-export async function submitToRunPod(input: {
-  prompt: string;
-  image_url: string;
-  ratio: string;
-  model: string;
-}, env: {
-  RUNPOD_API_KEY: string;
-  RUNPOD_ENDPOINT_ID: string;
-}) {
-  if (!env.RUNPOD_API_KEY) {
-    throw new Error("Missing RUNPOD_API_KEY");
-  }
-  if (!env.RUNPOD_ENDPOINT_ID) {
-    throw new Error("Missing RUNPOD_ENDPOINT_ID");
+
+export async function submitToRunPod(
+  input: {
+    prompt: string;
+    image_url: string;
+    ratio?: string;
+    model?: string;
+  },
+  env: any
+) {
+  const endpointId = env.RUNPOD_ENDPOINT_ID;
+  const apiKey = env.RUNPOD_API_KEY;
+
+  if (!endpointId || !apiKey) {
+    throw new Error("Missing RUNPOD config");
   }
 
-  const endpoint = `https://api.runpod.ai/v2/${env.RUNPOD_ENDPOINT_ID}/run`;
-
-  // *** RunPod v2 expects: { input: {...} } ***
   const payload = {
     input: {
       prompt: input.prompt,
-      image_url: input.image_url,
-      ratio: input.ratio,
-      model: input.model,
-    }
+      image: input.image_url,
+      ratio: input.ratio || "1:1",
+      model: input.model || "qwen-image",
+    },
   };
 
-  const res = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${env.RUNPOD_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-
-  const text = await res.text();
+  const res = await fetch(
+    `https://api.runpod.ai/v2/${endpointId}/run`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(payload),
+    }
+  );
 
   if (!res.ok) {
-    throw new Error(`RunPod submit failed (${res.status}): ${text}`);
+    const text = await res.text();
+    throw new Error(`RunPod error ${res.status}: ${text}`);
   }
 
-  return JSON.parse(text);
+  return await res.json();
 }

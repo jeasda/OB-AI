@@ -1,7 +1,7 @@
 // src/routes/runpod.ts
 import type { Env } from "../index";
 import type { ExecutionContext } from "@cloudflare/workers-types";
-import { submitToRunpod } from "../services/runpod.service";
+import { submitToRunPod } from "../services/runpod.service";
 
 function corsHeaders(origin?: string) {
   return {
