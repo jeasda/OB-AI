@@ -50,19 +50,21 @@ export async function handleQueueCreate(request: Request, env: Env) {
         const fileName = imageFile.name || "upload.png";
         // @ts-ignore
         const fileType = imageFile.type || "image/png";
+        // @ts-ignore
+        const fileSize = imageFile.size || 0;
+
+        console.log(`Uploading ${fileName} (${fileSize} bytes) via stream...`);
 
         const ext = fileName.split('.').pop() || 'png';
         const r2Path = `uploads/${year}/${month}/${fileId}.${ext}`;
 
-        // Safer upload
+        // Stream upload (Memory Efficient)
         try {
-          // @ts-ignore
-          const buffer = await imageFile.arrayBuffer();
-          await env.R2_RESULTS.put(r2Path, buffer, {
+          await env.R2_RESULTS.put(r2Path, imageFile.stream(), {
             httpMetadata: { contentType: fileType }
           });
           imageUrl = `https://cdn.obaistudio.com/${r2Path}`;
-          console.log(`Uploaded: ${imageUrl}`);
+          console.log(`Uploaded (Stream): ${imageUrl}`);
         } catch (uploadErr: any) {
           console.error("R2 Upload Failed:", uploadErr);
           return json({ ok: false, error: `Upload failed: ${uploadErr.message}` }, 500);
