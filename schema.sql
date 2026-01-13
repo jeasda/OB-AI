@@ -1,16 +1,13 @@
 CREATE TABLE IF NOT EXISTS jobs (
   id TEXT PRIMARY KEY,
-  runpod_job_id TEXT,
-  status TEXT,
+  status TEXT NOT NULL,
   prompt TEXT,
   model TEXT,
   ratio TEXT,
   image_url TEXT,
-  output_url TEXT,
-  result_r2_key TEXT,
-  result_url TEXT,
-  finished_at TEXT,
+  runpod_job_id TEXT,
+  output_image_url TEXT,
   error_message TEXT,
-  created_at TEXT,
-  updated_at TEXT
+  created_at INTEGER,
+  updated_at INTEGER
 );
