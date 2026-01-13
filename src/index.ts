@@ -37,7 +37,7 @@ function json(data: unknown, status = 200) {
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
       // Handle CORS preflight
       if (request.method === "OPTIONS") {
