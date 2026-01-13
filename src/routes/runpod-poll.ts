@@ -1,24 +1,67 @@
-// src/routes/runpod-poll.ts
-import type { Env } from "../index";
-import { pollAllRunningJobs } from "../services/poll.service";
+import { Router } from "itty-router";
 
-function json(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      "content-type": "application/json; charset=utf-8",
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization"
-    },
-  });
-}
+const router = Router();
 
-export async function handleRunpodPoll(_request: Request, env: Env) {
-  try {
-    const result = await pollAllRunningJobs(env);
-    return json({ ok: true, ...result });
-  } catch (e: any) {
-    return json({ ok: false, error: String(e?.message || e) }, 500);
+router.get("/api/runpod/poll", async (request, env) => {
+  const jobs = await env.DB.prepare(
+    `SELECT id, runpod_job_id FROM jobs
+     WHERE status = 'queued'
+     LIMIT 5`
+  ).all();
+
+  for (const job of jobs.results) {
+    try {
+      const res = await fetch(
+        `https://api.runpod.ai/v2/${env.RUNPOD_ENDPOINT_ID}/status/${job.runpod_job_id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${env.RUNPOD_API_KEY}`,
+          },
+        }
+      );
+
+      const data = await res.json();
+
+      if (data.status === "COMPLETED") {
+        const imageBase64 = data.output?.image;
+        if (!imageBase64) continue;
+
+        const buffer = Uint8Array.from(
+          atob(imageBase64),
+          c => c.charCodeAt(0)
+        );
+
+        const key = `outputs/${job.id}.png`;
+
+        await env.R2_RESULTS.put(key, buffer, {
+          httpMetadata: { contentType: "image/png" },
+        });
+
+        const publicUrl = `https://cdn.obaistudio.com/${key}`;
+
+        await env.DB.prepare(
+          `UPDATE jobs
+           SET status = 'completed',
+               output_image_url = ?,
+               updated_at = ?
+           WHERE id = ?`
+        )
+          .bind(publicUrl, Date.now(), job.id)
+          .run();
+      }
+    } catch (e: any) {
+      await env.DB.prepare(
+        `UPDATE jobs
+         SET status = 'failed',
+             error_message = ?
+         WHERE id = ?`
+      )
+        .bind(String(e), job.id)
+        .run();
+    }
   }
-}
+
+  return new Response(JSON.stringify({ ok: true }));
+});
+
+export default router;
