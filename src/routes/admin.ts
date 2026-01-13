@@ -54,6 +54,18 @@ export async function handleAdminMigrate(request: Request, env: Env) {
             report.push(`❌ Create Table jobs failed: ${e}`);
         }
 
+        // Add runpod_job_id
+        try {
+            await env.DB.prepare("ALTER TABLE jobs ADD COLUMN runpod_job_id TEXT").run();
+            report.push("✅ Column 'runpod_job_id' added.");
+        } catch (e: any) {
+            if (e.message?.includes("duplicate column")) {
+                report.push("ℹ️ Column 'runpod_job_id' already exists.");
+            } else {
+                report.push(`⚠️ Add 'runpod_job_id' failed (might exist): ${e.message}`);
+            }
+        }
+
         // Add model
         try {
             await env.DB.prepare("ALTER TABLE jobs ADD COLUMN model TEXT").run();
