@@ -14,16 +14,53 @@ function nowISO() {
 
 export async function handleQueueCreate(request: Request, env: Env) {
   try {
-    const body = (await request.json().catch(() => null)) as
-      | { prompt?: string; model?: string; ratio?: string; image?: string }
-      | null;
+    const contentType = request.headers.get("content-type") || "";
+    let prompt = "";
+    let model = "qwen-image";
+    let ratio = "1:1";
+    let imageUrl = "";
 
-    const prompt = (body?.prompt || "").trim();
-    const model = (body?.model || "qwen-image").trim();
-    const ratio = (body?.ratio || "1:1").trim();
-    const imageUrl = (body?.image || "").trim();
+    // Handle Multipart (Required for Image Edit)
+    if (contentType.includes("multipart/form-data")) {
+      const formData = await request.formData();
+      prompt = (formData.get("prompt") as string || "").trim();
+      ratio = (formData.get("ratio") as string || "1:1").trim();
+      model = (formData.get("model") as string || "qwen-image").trim();
+
+      const imageFile = formData.get("image");
+      if (imageFile && imageFile instanceof File) {
+        // Upload input to R2
+        const fileId = crypto.randomUUID();
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        // Simple extension detection or default to png
+        const ext = imageFile.name.split('.').pop() || 'png';
+        const r2Path = `uploads/${year}/${month}/${fileId}.${ext}`;
+
+        await env.R2_RESULTS.put(r2Path, imageFile.stream(), {
+          httpMetadata: { contentType: imageFile.type }
+        });
+
+        // Construct Public URL (e.g., https://cdn.obaistudio.com/...)
+        // For now, assume a standard public R2 or worker route. 
+        // Using a placeholder domain or the worker domain if configured.
+        imageUrl = `https://cdn.obaistudio.com/${r2Path}`;
+      }
+    } else {
+      // JSON Fallback (Legacy / Test)
+      const body = (await request.json().catch(() => null)) as any;
+      if (body) {
+        prompt = (body.prompt || "").trim();
+        model = (body.model || "qwen-image").trim();
+        ratio = (body.ratio || "1:1").trim();
+        imageUrl = (body.image || "").trim();
+      }
+    }
 
     if (!prompt) return json({ ok: false, error: "prompt is required" }, 400);
+    // For V2 Image Edit, Image is REQUIRED.
+    if (!imageUrl) return json({ ok: false, error: "image is required for editing" }, 400);
 
     const id = crypto.randomUUID();
     const ts = nowISO();

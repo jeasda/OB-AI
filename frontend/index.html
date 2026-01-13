@@ -1,77 +1,109 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OB AI Studio</title>
+  <title>OB AI Studio - Image Edit</title>
   <link rel="stylesheet" href="style.css">
   <link rel="icon" type="image/png" href="logo.png">
 </head>
+
 <body>
-  <main class="container">
-    <header>
-      <h1>OB AI Studio</h1>
-    </header>
+  <div class="app-container">
 
-    <!-- 1. Create View -->
-    <section id="create-view" class="view-section">
-      <div class="form-group">
-        <label for="prompt">Prompt</label>
-        <textarea id="prompt" placeholder="Describe the image you want to generate..." autofocus></textarea>
-      </div>
+    <!-- LEFT PANEL: CONTROLS -->
+    <aside class="panel-left">
+      <header>
+        <h1>OB AI Studio</h1>
+        <p class="subtitle">AI Image Editor (Qwen-VL)</p>
+      </header>
 
+      <!-- 1. Source Image -->
       <div class="form-group">
-        <label for="ratio">Aspect Ratio</label>
-        <div class="controls-row">
-          <select id="ratio">
-            <option value="1:1" selected>1:1 (Square)</option>
-            <option value="4:3">4:3 (Photo)</option>
-            <option value="3:4">3:4 (Portrait)</option>
-            <option value="16:9">16:9 (Landscape)</option>
-            <option value="9:16">9:16 (Mobile)</option>
-          </select>
+        <label>1. Upload Image (Required)</label>
+        <div id="drop-zone" class="drop-zone">
+          <div class="drop-zone-text">
+            <span>📷</span>
+            <p>Drag & Drop or Click</p>
+            <p style="font-size: 0.8rem; opacity: 0.6">JPG / PNG Only</p>
+          </div>
+          <input type="file" id="file-input" accept="image/png, image/jpeg" style="display: none;">
+          <img id="preview-img" class="preview hidden" alt="Source Preview">
         </div>
       </div>
 
-      <button id="generate-btn" class="btn-primary">Generate Image</button>
-    </section>
+      <!-- 2. Prompt -->
+      <div class="form-group">
+        <label for="prompt">2. Edit Instruction</label>
+        <textarea id="prompt"
+          placeholder="e.g. Change the dress to silver color, make it cinematic lighting..."></textarea>
+      </div>
 
-    <!-- 2. Processing View -->
-    <section id="processing-view" class="view-section hidden">
-      <div class="processing-state">
-        <div class="spinner-icon">✨</div>
-        <h2 style="font-size: 1.25rem; margin-bottom: 0.5rem;">Creating Magic...</h2>
-        <div class="progress-container">
+      <!-- 3. Ratio -->
+      <div class="form-group">
+        <label for="ratio">3. Aspect Ratio</label>
+        <select id="ratio">
+          <option value="1:1" selected>1:1 (Square)</option>
+          <option value="4:5">4:5 (Social Portrait)</option>
+          <option value="3:4">3:4 (Portrait)</option>
+          <option value="9:16">9:16 (Story)</option>
+          <option value="16:9">16:9 (Landscape)</option>
+        </select>
+      </div>
+
+      <!-- Generate Button -->
+      <button id="generate-btn" class="btn-primary" disabled>Generate Edit ✨</button>
+    </aside>
+
+    <!-- RIGHT PANEL: PREVIEW / RESULT -->
+    <main class="panel-right">
+
+      <!-- State 0: Empty -->
+      <div id="view-empty" class="empty-state">
+        <svg fill="currentColor" viewBox="0 0 20 20">
+          <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" />
+        </svg>
+        <p>Your result will appear here</p>
+      </div>
+
+      <!-- State 1: Processing -->
+      <div id="view-processing" class="processing-container hidden">
+        <div class="spinner-icon" style="font-size: 3rem; margin-bottom: 1rem; animation: spin 2s infinite linear;">⚡
+        </div>
+        <h2 id="status-main" style="margin-bottom: 0.5rem">Starting...</h2>
+        <div class="progress-bar-container">
           <div id="progress-bar" class="progress-bar"></div>
         </div>
-        <p id="status-text" class="status-text">Starting job...</p>
-      </div>
-    </section>
-
-    <!-- 3. Result View -->
-    <section id="result-view" class="view-section hidden">
-      <div class="result-image-container">
-        <img id="result-img" src="" alt="Generated Image">
-      </div>
-      
-      <div class="result-info" style="margin-bottom: 1rem; color: var(--text-muted); font-size: 0.9rem;">
-        <p id="result-prompt" style="font-style: italic; opacity: 0.8;"></p>
+        <p id="status-detail" class="status-text" style="font-size: 0.9rem; opacity: 0.7">Preparing resources...</p>
       </div>
 
-      <div class="result-actions">
-        <a id="download-btn" href="#" download class="btn btn-primary">Download</a>
-        <button id="reset-btn" class="btn btn-secondary">Create Another</button>
+      <!-- State 2: Result -->
+      <div id="view-result" class="result-container hidden">
+        <div class="image-wrapper">
+          <img id="result-img" src="" alt="AI Result">
+        </div>
+        <div class="result-actions">
+          <a id="download-btn" href="#" download target="_blank" class="btn-secondary">
+            ⬇ Download Image
+          </a>
+          <button id="reset-btn" class="btn-secondary">
+            ↺ Edit Another
+          </button>
+        </div>
       </div>
-    </section>
 
-    <!-- Error View -->
-    <section id="error-view" class="view-section hidden" style="text-align: center;">
-      <h2 style="color: #ef4444; margin-bottom: 1rem;">Creation Failed</h2>
-      <p id="error-msg" style="color: var(--text-muted); margin-bottom: 2rem;">Something went wrong.</p>
-      <button id="retry-btn" class="btn btn-primary">Try Again</button>
-    </section>
+      <!-- State 3: Error -->
+      <div id="view-error" class="hidden" style="text-align: center; color: #ef4444;">
+        <h2 style="font-size: 2rem; margin-bottom: 1rem;">❌</h2>
+        <h3>Creation Failed</h3>
+        <p id="error-msg" style="margin: 1rem 0; color: var(--text-muted);"></p>
+        <button id="retry-btn" class="btn-secondary" style="border-color: #ef4444;">Try Again</button>
+      </div>
 
-  </main>
+    </main>
+  </div>
   <script src="app.js"></script>
 </body>
+
 </html>
