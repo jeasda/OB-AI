@@ -1,8 +1,7 @@
-import { Router } from "itty-router";
-
-const router = Router();
-
-router.get("/api/runpod/poll", async (request, env) => {
+export default async function pollHandler(
+  request: Request,
+  env: any
+) {
   const jobs = await env.DB.prepare(
     `SELECT id, runpod_job_id FROM jobs
      WHERE status = 'queued'
@@ -22,33 +21,34 @@ router.get("/api/runpod/poll", async (request, env) => {
 
       const data = await res.json();
 
-      if (data.status === "COMPLETED") {
-        const imageBase64 = data.output?.image;
-        if (!imageBase64) continue;
+      if (data.status !== "COMPLETED") continue;
 
-        const buffer = Uint8Array.from(
-          atob(imageBase64),
-          c => c.charCodeAt(0)
-        );
+      const imageBase64 = data.output?.image;
+      if (!imageBase64) continue;
 
-        const key = `outputs/${job.id}.png`;
+      const buffer = Uint8Array.from(
+        atob(imageBase64),
+        c => c.charCodeAt(0)
+      );
 
-        await env.R2_RESULTS.put(key, buffer, {
-          httpMetadata: { contentType: "image/png" },
-        });
+      const key = `outputs/${job.id}.png`;
 
-        const publicUrl = `https://cdn.obaistudio.com/${key}`;
+      await env.R2_RESULTS.put(key, buffer, {
+        httpMetadata: { contentType: "image/png" },
+      });
 
-        await env.DB.prepare(
-          `UPDATE jobs
-           SET status = 'completed',
-               output_image_url = ?,
-               updated_at = ?
-           WHERE id = ?`
-        )
-          .bind(publicUrl, Date.now(), job.id)
-          .run();
-      }
+      const publicUrl = `https://cdn.obaistudio.com/${key}`;
+
+      await env.DB.prepare(
+        `UPDATE jobs
+         SET status = 'completed',
+             output_image_url = ?,
+             updated_at = ?
+         WHERE id = ?`
+      )
+        .bind(publicUrl, Date.now(), job.id)
+        .run();
+
     } catch (e: any) {
       await env.DB.prepare(
         `UPDATE jobs
@@ -61,7 +61,7 @@ router.get("/api/runpod/poll", async (request, env) => {
     }
   }
 
-  return new Response(JSON.stringify({ ok: true }));
-});
-
-export default router;
+  return new Response(JSON.stringify({ ok: true }), {
+    headers: { "Content-Type": "application/json" },
+  });
+}

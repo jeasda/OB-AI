@@ -1,19 +1,25 @@
-import { Router } from "itty-router";
-import runpodRoutes from "./routes/runpod";
-import pollRoutes from "./routes/runpod-poll";
-
-const router = Router();
-
-router.all("*", runpodRoutes.handle);
-router.all("*", pollRoutes.handle);
-
-router.get("/", () =>
-  new Response(
-    JSON.stringify({ ok: true, service: "ob-ai-api", status: "running" }),
-    { headers: { "Content-Type": "application/json" } }
-  )
-);
+import runpodHandler from "./routes/runpod";
+import pollHandler from "./routes/runpod-poll";
 
 export default {
-  fetch: (request, env, ctx) => router.handle(request, env, ctx),
+  async fetch(request: Request, env: any) {
+    const url = new URL(request.url);
+
+    if (url.pathname === "/") {
+      return new Response(
+        JSON.stringify({ ok: true, service: "ob-ai-api", status: "running" }),
+        { headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    if (url.pathname === "/api/queue/create") {
+      return runpodHandler(request, env);
+    }
+
+    if (url.pathname === "/api/runpod/poll") {
+      return pollHandler(request, env);
+    }
+
+    return new Response("Not Found", { status: 404 });
+  },
 };
