@@ -2,7 +2,7 @@
 
 // CONFIG: API Base URL
 // Example: https://ob-ai-api.workers.dev
-const API_BASE = "https://ob-ai-api.workers.dev";
+const API_BASE = "https://ob-ai-api.legacy-project.workers.dev";
 
 const API_CREATE = `${API_BASE}/api/queue/create`;
 const API_STATUS = `${API_BASE}/api/queue/status`;
