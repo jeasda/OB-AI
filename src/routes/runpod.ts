@@ -28,19 +28,13 @@ export async function handleRunpod(request: Request, env: Env) {
     let jobId = (body?.jobId || "").trim();
     let prompt = (body?.prompt || "").trim();
     let model = (body?.model || "").trim();
-
-    // DEBUG: Check all env vars
-    console.log("=== ENV DEBUG ===");
-    console.log("RUNPOD_API_KEY present?", !!env.RUNPOD_API_KEY);
-    console.log("RUNPOD_API_KEY type:", typeof env.RUNPOD_API_KEY);
-    console.log("RUNPOD_ENDPOINT_ID:", env.RUNPOD_ENDPOINT_ID);
-    console.log("All env keys:", Object.keys(env));
-    console.log("=================");
+    let ratio = "";
+    let imageUrl = "";
 
     // โหมด B: ถ้าไม่ส่ง jobId -> pick queued 1 งาน
     if (!jobId) {
       const picked = await env.DB.prepare(
-        `SELECT id, prompt, model FROM jobs WHERE status='queued' ORDER BY created_at ASC LIMIT 1`
+        `SELECT id, prompt, model, ratio, image_url FROM jobs WHERE status='queued' ORDER BY created_at ASC LIMIT 1`
       ).all();
 
       const row = picked.results?.[0] as any;
@@ -49,11 +43,13 @@ export async function handleRunpod(request: Request, env: Env) {
       jobId = row.id;
       prompt = row.prompt;
       model = row.model;
+      ratio = row.ratio || "1:1";
+      imageUrl = row.image_url || "";
     } else {
       // ถ้าส่ง jobId มา แต่ไม่ได้ส่ง prompt/model -> ดึงจาก DB
       if (!prompt || !model) {
         const r = await env.DB.prepare(
-          `SELECT prompt, model, status FROM jobs WHERE id = ? LIMIT 1`
+          `SELECT prompt, model, ratio, image_url, status FROM jobs WHERE id = ? LIMIT 1`
         )
           .bind(jobId)
           .first();
@@ -65,11 +61,24 @@ export async function handleRunpod(request: Request, env: Env) {
 
         prompt = prompt || (r as any).prompt;
         model = model || (r as any).model;
+        ratio = (r as any).ratio || "1:1";
+        imageUrl = (r as any).image_url || "";
       }
     }
 
     // ส่งไป Runpod
-    const runpod = await runpodSubmitJob(env, { prompt, model, jobId });
+    // Map data to match RunPod/ComfyUI expectations
+    const payload = {
+      prompt,
+      model,
+      jobId,
+      ratio,
+      image_url: imageUrl,
+      image: imageUrl // Send both to be safe
+    };
+
+    console.log("Submitting to RunPod w/ Payload:", JSON.stringify(payload));
+    const runpod = await runpodSubmitJob(env, payload);
 
     // อัปเดต queue: running + runpod_job_id
     const ts = nowISO();
