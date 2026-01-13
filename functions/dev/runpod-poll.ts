@@ -1,104 +1,169 @@
-import type { PagesFunction } from "@cloudflare/workers-types";
-console.log("🔥 RUNPOD POLL WORKER v2026-01-10 LOADED");
+// C:\Anti_OB\runninghub-app\functions\dev\runpod-poll.ts
 
+export interface Env {
+  DB: D1Database;
+  RUNPOD_API_KEY: string;
+  RUNPOD_ENDPOINT_ID: string; // endpoint id ของ serverless
+  RUNPOD_BASE_URL?: string;   // optional, default https://api.runpod.ai
+}
 
-/**
- * POST /dev/runpod-poll
- *
- * - ไม่รับ body
- * - ไม่อ่าน request.json()
- * - ใช้สำหรับ poll สถานะ job จาก RunPod
- */
-export const onRequestPost: PagesFunction = async ({ env }) => {
+type QueueRow = {
+  id: string;
+  prompt: string | null;
+  model: string | null;
+  status: string | null;
+  runpod_job_id: string | null;
+  created_at: string | null;
+  updated_at?: string | null;
+};
+
+function json(data: any, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "access-control-allow-origin": "*",
+    },
+  });
+}
+
+async function runpodGetStatus(env: Env, runpodJobId: string) {
+  const base = env.RUNPOD_BASE_URL || "https://api.runpod.ai";
+  const url = `${base}/v2/${env.RUNPOD_ENDPOINT_ID}/status/${runpodJobId}`;
+
+  const r = await fetch(url, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${env.RUNPOD_API_KEY}`,
+    },
+  });
+
+  const text = await r.text();
+  let data: any = null;
   try {
-    // 1) ดึง job ที่กำลัง running และมี runpod_job_id
-    const { results } = await env.DB
-      .prepare(`
-        SELECT id, runpod_job_id
-        FROM queue
-        WHERE status = 'running'
-          AND runpod_job_id IS NOT NULL
-      `)
-      .all();
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = { raw: text };
+  }
 
-    let updated: any[] = [];
+  return { ok: r.ok, status: r.status, data };
+}
 
-    // 2) loop ไปเช็คสถานะจาก RunPod
-    for (const job of results) {
-      const runpodJobId = job.runpod_job_id;
+function pickResult(data: any): { result_url?: string; result_json?: string } {
+  // Runpod response มักมีหลายรูปแบบ ตาม handler ของลูกพี่
+  // เราจะ “เก็บทั้งก้อน” เป็น result_json และพยายามเดา url ถ้ามี
+  let result_url: string | undefined;
 
-      // เรียก RunPod API
-      const res = await fetch(
-        `https://api.runpod.ai/v2/${env.RUNPOD_ENDPOINT_ID}/status/${runpodJobId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${env.RUNPOD_API_KEY}`,
-          },
-        }
-      );
+  const output = data?.output ?? data?.result ?? null;
 
-      const data = await res.json();
+  // ถ้า output เป็น string แล้วดูเหมือน url
+  if (typeof output === "string" && /^https?:\/\//.test(output)) {
+    result_url = output;
+  }
 
-      // 3) ถ้า job เสร็จ
-      if (data.status === "COMPLETED") {
-        await env.DB
-          .prepare(`
-            UPDATE queue
-            SET status = 'done'
-            WHERE id = ?
-          `)
-          .bind(job.id)
-          .run();
+  // ถ้า output เป็น object/array แล้วมี url อยู่ข้างใน
+  if (!result_url && output && typeof output === "object") {
+    const candidates = [
+      output.url,
+      output.image_url,
+      output.images?.[0],
+      output.images?.[0]?.url,
+      output[0],
+      output[0]?.url,
+    ].filter(Boolean);
 
-        updated.push({
-          id: job.id,
-          status: "done",
-        });
-      }
+    const first = candidates[0];
+    if (typeof first === "string" && /^https?:\/\//.test(first)) result_url = first;
+  }
 
-      // 4) ถ้า job พัง
-      if (data.status === "FAILED") {
-        await env.DB
-          .prepare(`
-            UPDATE queue
-            SET status = 'error'
-            WHERE id = ?
-          `)
-          .bind(job.id)
-          .run();
+  return {
+    result_url,
+    result_json: JSON.stringify(data ?? {}),
+  };
+}
 
-        updated.push({
-          id: job.id,
-          status: "error",
-        });
-      }
+export async function onRequestPost(context: { request: Request; env: Env }) {
+  const { request, env } = context;
+
+  // กัน error JSON ว่าง
+  const body = await request.json().catch(() => ({} as any));
+
+  // optional: จำกัดจำนวนงานต่อครั้ง
+  const limit = Math.min(Number(body?.limit ?? 10), 25);
+
+  // ดึงงานที่กำลัง running และมี runpod_job_id
+  const rows = await env.DB.prepare(
+    `SELECT id, prompt, model, status, runpod_job_id, created_at
+     FROM queue
+     WHERE status = 'running' AND runpod_job_id IS NOT NULL
+     ORDER BY created_at ASC
+     LIMIT ?`
+  )
+    .bind(limit)
+    .all<QueueRow>();
+
+  const updated: any[] = [];
+  let checked = 0;
+
+  for (const job of rows.results ?? []) {
+    checked++;
+
+    const runpodJobId = job.runpod_job_id!;
+    const resp = await runpodGetStatus(env, runpodJobId);
+
+    if (!resp.ok) {
+      // ถ้าเรียก runpod ไม่ได้ -> ไม่อัพเดต status ทิ้ง (กัน false alarm)
+      updated.push({
+        id: job.id,
+        runpod_job_id: runpodJobId,
+        note: "runpod status fetch failed",
+        http_status: resp.status,
+      });
+      continue;
     }
 
-    // 5) response
-    return new Response(
-      JSON.stringify({
-        ok: true,
-        checked: results.length,
-        updated,
-      }),
-      {
-        headers: {
-          "content-type": "application/json",
-        },
-      }
-    );
-  } catch (err: any) {
-    return new Response(
-      JSON.stringify({
-        ok: false,
-        error: err?.message || String(err),
-      }),
-      {
-        status: 500,
-        headers: {
-          "content-type": "application/json",
-        },
-      }
-    );
+    const data = resp.data;
+    const status = (data?.status || "").toString().toUpperCase();
+
+    // status ตัวอย่างที่เจอบ่อย: IN_QUEUE, IN_PROGRESS, COMPLETED, FAILED, CANCELED
+    if (status === "COMPLETED") {
+      const picked = pickResult(data);
+
+      await env.DB.prepare(
+        `UPDATE queue
+         SET status='done',
+             result_url=?,
+             result_json=?,
+             error=NULL,
+             updated_at=?
+         WHERE id=?`
+      )
+        .bind(
+          picked.result_url ?? null,
+          picked.result_json ?? null,
+          new Date().toISOString(),
+          job.id
+        )
+        .run();
+
+      updated.push({ id: job.id, runpod_job_id: runpodJobId, status: "done", result_url: picked.result_url ?? null });
+    } else if (status === "FAILED" || status === "CANCELED") {
+      await env.DB.prepare(
+        `UPDATE queue
+         SET status='error',
+             error=?,
+             updated_at=?
+         WHERE id=?`
+      )
+        .bind(JSON.stringify(data ?? {}), new Date().toISOString(), job.id)
+        .run();
+
+      updated.push({ id: job.id, runpod_job_id: runpodJobId, status: "error" });
+    } else {
+      // IN_QUEUE / IN_PROGRESS -> ยังไม่ done
+      updated.push({ id: job.id, runpod_job_id: runpodJobId, status: job.status, runpod_status: status });
+    }
   }
-};
+
+  return json({ ok: true, checked, updated });
+}

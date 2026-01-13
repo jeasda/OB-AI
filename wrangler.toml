@@ -1,5 +1,15 @@
 name = "ob-ai-api"
 compatibility_date = "2025-01-01"
+main = "src/index.ts"
 
-[pages]
-functions_directory = "functions"
+[[d1_databases]]
+binding = "DB"
+database_name = "obai"
+database_id = "d4c9a2fb-0635-4fcb-bd48-e8faa1a6ae21"
+
+[triggers]
+crons = ["* * * * *"] # Run every 1 minute
+
+[[r2_buckets]]
+binding = "R2_RESULTS"
+bucket_name = "ob-ai-results"

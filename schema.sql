@@ -5,6 +5,10 @@ CREATE TABLE IF NOT EXISTS jobs (
   prompt TEXT,
   image_url TEXT,
   output_url TEXT,
+  result_r2_key TEXT,
+  result_url TEXT,
+  finished_at TEXT,
+  error_message TEXT,
   created_at TEXT,
   updated_at TEXT
 );

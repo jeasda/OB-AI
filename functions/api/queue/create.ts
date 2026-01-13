@@ -4,11 +4,11 @@ export async function onRequestPost({ request, env }: any) {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
 
-  await env.DB.prepare(
-    `INSERT INTO queue (id, prompt, model, status, created_at)
-     VALUES (?, ?, ?, ?, ?)`
-  )
-    .bind(id, body.prompt, body.model, "queued", now)
+  await env.obai_db.prepare(`
+    INSERT INTO queue (id, prompt, model, status, created_at)
+    VALUES (?, ?, ?, 'queued', ?)
+  `)
+    .bind(id, body.prompt, body.model, now)
     .run();
 
   return new Response(
