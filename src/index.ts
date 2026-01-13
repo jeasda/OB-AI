@@ -27,12 +27,28 @@ export interface Env {
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { "content-type": "application/json; charset=utf-8" },
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+    },
   });
 }
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    // Handle CORS preflight
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type",
+        },
+      });
+    }
+
     const url = new URL(request.url);
 
     // health
@@ -45,13 +61,19 @@ export default {
       return handleQueueCreate(request, env);
     }
 
+    // API: check status
+    if (url.pathname === "/api/queue/status" && request.method === "GET") {
+      const { handleQueueStatus } = await import("./routes/queue");
+      return handleQueueStatus(request, env);
+    }
+
     // DEV: dispatch 1 queued job -> runpod
     if (url.pathname === "/dev/runpod" && request.method === "POST") {
       return handleRunpod(request, env);
     }
 
-    // DEV: poll runpod for running jobs
-    if (url.pathname === "/dev/runpod-poll" && request.method === "POST") {
+    // DEV: poll runpod for running jobs (Internal/Manual trigger)
+    if ((url.pathname === "/dev/runpod-poll" || url.pathname === "/api/runpod-poll") && request.method === "POST") {
       return handleRunpodPoll(request, env);
     }
 

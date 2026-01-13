@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OB AI Studio</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" type="image/png" href="logo.png">
+</head>
+<body>
+  <main class="container">
+    <header>
+      <h1>OB AI Studio</h1>
+    </header>
+
+    <!-- 1. Create View -->
+    <section id="create-view" class="view-section">
+      <div class="form-group">
+        <label for="prompt">Prompt</label>
+        <textarea id="prompt" placeholder="Describe the image you want to generate..." autofocus></textarea>
+      </div>
+
+      <div class="form-group">
+        <label for="ratio">Aspect Ratio</label>
+        <div class="controls-row">
+          <select id="ratio">
+            <option value="1:1" selected>1:1 (Square)</option>
+            <option value="4:3">4:3 (Photo)</option>
+            <option value="3:4">3:4 (Portrait)</option>
+            <option value="16:9">16:9 (Landscape)</option>
+            <option value="9:16">9:16 (Mobile)</option>
+          </select>
+        </div>
+      </div>
+
+      <button id="generate-btn" class="btn-primary">Generate Image</button>
+    </section>
+
+    <!-- 2. Processing View -->
+    <section id="processing-view" class="view-section hidden">
+      <div class="processing-state">
+        <div class="spinner-icon">✨</div>
+        <h2 style="font-size: 1.25rem; margin-bottom: 0.5rem;">Creating Magic...</h2>
+        <div class="progress-container">
+          <div id="progress-bar" class="progress-bar"></div>
+        </div>
+        <p id="status-text" class="status-text">Starting job...</p>
+      </div>
+    </section>
+
+    <!-- 3. Result View -->
+    <section id="result-view" class="view-section hidden">
+      <div class="result-image-container">
+        <img id="result-img" src="" alt="Generated Image">
+      </div>
+      
+      <div class="result-info" style="margin-bottom: 1rem; color: var(--text-muted); font-size: 0.9rem;">
+        <p id="result-prompt" style="font-style: italic; opacity: 0.8;"></p>
+      </div>
+
+      <div class="result-actions">
+        <a id="download-btn" href="#" download class="btn btn-primary">Download</a>
+        <button id="reset-btn" class="btn btn-secondary">Create Another</button>
+      </div>
+    </section>
+
+    <!-- Error View -->
+    <section id="error-view" class="view-section hidden" style="text-align: center;">
+      <h2 style="color: #ef4444; margin-bottom: 1rem;">Creation Failed</h2>
+      <p id="error-msg" style="color: var(--text-muted); margin-bottom: 2rem;">Something went wrong.</p>
+      <button id="retry-btn" class="btn btn-primary">Try Again</button>
+    </section>
+
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
