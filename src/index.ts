@@ -86,9 +86,13 @@ export default {
 
       return json({ ok: false, error: "Not found", path: url.pathname }, 404);
     } catch (e: any) {
-      // Global Error Handler to ensure CORS is always sent
+      // Global Error Handler to ensure CORS is always sent - SAFE SERIALIZATION
       console.error(e);
-      return json({ ok: false, error: String(e?.message || e), stack: e?.stack }, 500);
+      return json({
+        ok: false,
+        error: typeof e === 'string' ? e : (e?.message || 'Unknown Error'),
+        // stack: e?.stack // Remove stack to prevent huge payloads or sensitive leaks
+      }, 500);
     }
   },
 

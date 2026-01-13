@@ -22,7 +22,13 @@ export async function handleQueueCreate(request: Request, env: Env) {
 
     // Handle Multipart (Required for Image Edit)
     if (contentType.includes("multipart/form-data")) {
-      const formData = await request.formData();
+      let formData;
+      try {
+        formData = await request.formData();
+      } catch (err) {
+        return json({ ok: false, error: "Failed to parse form data. Image too large?" }, 400);
+      }
+
       prompt = (formData.get("prompt") as string || "").trim();
       ratio = (formData.get("ratio") as string || "1:1").trim();
       model = (formData.get("model") as string || "qwen-image").trim();
@@ -49,15 +55,18 @@ export async function handleQueueCreate(request: Request, env: Env) {
         const r2Path = `uploads/${year}/${month}/${fileId}.${ext}`;
 
         // Safer upload
-        // @ts-ignore
-        const buffer = await imageFile.arrayBuffer();
-
-        await env.R2_RESULTS.put(r2Path, buffer, {
-          httpMetadata: { contentType: fileType }
-        });
-
-        imageUrl = `https://cdn.obaistudio.com/${r2Path}`;
-        console.log(`Uploaded: ${imageUrl}`);
+        try {
+          // @ts-ignore
+          const buffer = await imageFile.arrayBuffer();
+          await env.R2_RESULTS.put(r2Path, buffer, {
+            httpMetadata: { contentType: fileType }
+          });
+          imageUrl = `https://cdn.obaistudio.com/${r2Path}`;
+          console.log(`Uploaded: ${imageUrl}`);
+        } catch (uploadErr: any) {
+          console.error("R2 Upload Failed:", uploadErr);
+          return json({ ok: false, error: `Upload failed: ${uploadErr.message}` }, 500);
+        }
       }
     } else {
       // JSON Fallback (Legacy / Test)
