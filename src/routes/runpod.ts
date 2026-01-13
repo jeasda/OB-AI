@@ -29,9 +29,13 @@ export async function handleRunpod(request: Request, env: Env) {
     let prompt = (body?.prompt || "").trim();
     let model = (body?.model || "").trim();
 
-    console.log("RUNPOD_API_KEY:", env.RUNPOD_API_KEY ? "OK" : "MISSING");
+    // DEBUG: Check all env vars
+    console.log("=== ENV DEBUG ===");
+    console.log("RUNPOD_API_KEY present?", !!env.RUNPOD_API_KEY);
+    console.log("RUNPOD_API_KEY type:", typeof env.RUNPOD_API_KEY);
     console.log("RUNPOD_ENDPOINT_ID:", env.RUNPOD_ENDPOINT_ID);
-
+    console.log("All env keys:", Object.keys(env));
+    console.log("=================");
 
     // โหมด B: ถ้าไม่ส่ง jobId -> pick queued 1 งาน
     if (!jobId) {
