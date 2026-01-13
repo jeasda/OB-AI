@@ -78,6 +78,12 @@ export default {
         return handleRunpodPoll(request, env);
       }
 
+      // DEV: Auto-Migrate DB (Self-Healing)
+      if (url.pathname === "/dev/migrate" && request.method === "GET") {
+        const { handleAdminMigrate } = await import("./routes/admin");
+        return handleAdminMigrate(request, env);
+      }
+
       return json({ ok: false, error: "Not found", path: url.pathname }, 404);
     } catch (e: any) {
       // Global Error Handler to ensure CORS is always sent
