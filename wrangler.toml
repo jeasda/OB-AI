@@ -1,12 +1,28 @@
 name = "ob-ai-api"
 main = "src/index.ts"
-compatibility_date = "2024-12-01"
+compatibility_date = "2025-01-14"
 
+# (แนะนำ) ถ้าใช้ node libs บางอย่าง
+compatibility_flags = ["nodejs_compat"]
+
+# -------- D1 --------
 [[d1_databases]]
 binding = "DB"
-database_name = "obaistudio-db"
+database_name = "obastudio-db"
 database_id = "d4c9a2fb-0635-4fcb-bd48-e8faa1a6ae21"
 
+# -------- R2 --------
 [[r2_buckets]]
 binding = "R2_RESULTS"
 bucket_name = "ob-ai-results"
+
+# -------- Env --------
+[vars]
+# RunPod Serverless endpoint id (ตามที่ลูกพี่มี)
+RUNPOD_ENDPOINT_ID = "i3qcfgz8v495h"
+
+# อนุญาต CORS ให้ Pages
+ALLOWED_ORIGINS = "https://ob-ai.pages.dev,http://localhost:3000"
+
+# โฟลเดอร์ใน R2 สำหรับไฟล์อัปโหลด
+R2_PREFIX = "uploads"
