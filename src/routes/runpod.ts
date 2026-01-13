@@ -53,12 +53,10 @@ export default async function runpodHandler(
 
   // submit to RunPod
   await submitToRunPod(env, {
-    jobId,
     prompt,
-    image: imageUrl,
-    ratio,
-    model,
+    image_url
   });
+
 
   return new Response(
     JSON.stringify({ ok: true, jobId }),
