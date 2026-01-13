@@ -17,7 +17,7 @@ function nowISO() {
   return new Date().toISOString();
 }
 
-export async function handleQueueCreate(request: Request, env: Env) {
+export async function handleQueueCreate(request: Request, env: Env, ctx: ExecutionContext) {
   try {
     const contentType = request.headers.get("content-type") || "";
     let prompt = "";
@@ -99,6 +99,29 @@ export async function handleQueueCreate(request: Request, env: Env) {
     )
       .bind(id, prompt, model, ratio, imageUrl, ts, ts)
       .run();
+
+    // Auto-Submit to RunPod (Fire & Forget)
+    ctx.waitUntil((async () => {
+      try {
+        console.log(`[Auto-Submit] Submitting job ${id} to RunPod...`);
+        const { runpodSubmitJob } = await import("../services/runpod");
+        const payload = { prompt, model, jobId: id, ratio, image_url: imageUrl, image: imageUrl };
+        const runpod = await runpodSubmitJob(env, payload);
+
+        const now = nowISO();
+        await env.DB.prepare(
+          `UPDATE jobs SET runpod_job_id = ?, status = 'running', updated_at = ? WHERE id = ?`
+        ).bind(runpod.id, now, id).run();
+
+        console.log(`[Auto-Submit] Job ${id} submitted. RunPod ID: ${runpod.id}`);
+      } catch (err: any) {
+        console.error(`[Auto-Submit] Failed for job ${id}:`, err);
+        const now = nowISO();
+        await env.DB.prepare(
+          `UPDATE jobs SET status = 'failed', error_message = ?, updated_at = ? WHERE id = ?`
+        ).bind(String(err?.message || err), now, id).run();
+      }
+    })());
 
     return json({ ok: true, id, status: "queued" });
   } catch (e: any) {

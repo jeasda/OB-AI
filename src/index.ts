@@ -59,7 +59,7 @@ export default {
 
       // API: create queue item
       if (url.pathname === "/api/queue/create" && request.method === "POST") {
-        return await handleQueueCreate(request, env);
+        return await handleQueueCreate(request, env, ctx); // Pass ctx
       }
 
       // API: check status
