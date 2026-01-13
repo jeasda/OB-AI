@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS jobs (
   runpod_job_id TEXT,
   status TEXT,
   prompt TEXT,
+  model TEXT,
   ratio TEXT,
   image_url TEXT,
   output_url TEXT,

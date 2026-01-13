@@ -54,6 +54,18 @@ export async function handleAdminMigrate(request: Request, env: Env) {
             report.push(`❌ Create Table jobs failed: ${e}`);
         }
 
+        // Add model
+        try {
+            await env.DB.prepare("ALTER TABLE jobs ADD COLUMN model TEXT").run();
+            report.push("✅ Column 'model' added.");
+        } catch (e: any) {
+            if (e.message?.includes("duplicate column")) {
+                report.push("ℹ️ Column 'model' already exists.");
+            } else {
+                report.push(`⚠️ Add 'model' failed (might exist): ${e.message}`);
+            }
+        }
+
         // Add ratio
         try {
             await env.DB.prepare("ALTER TABLE jobs ADD COLUMN ratio TEXT").run();
