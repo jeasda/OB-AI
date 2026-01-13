@@ -32,6 +32,9 @@ export async function runpodSubmitJob(
     }),
   });
 
+  // LOG REQUEST BODY FOR DEBUGGING
+  console.log("RunPod Request Body:", JSON.stringify({ input }));
+
   if (!res.ok) {
     const text = await res.text();
     console.error(`[RunPod Error] Status: ${res.status}, Body: ${text}`);
