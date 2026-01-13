@@ -1,50 +1,35 @@
-// src/services/runpod.service.ts
-import type { Env } from "../index";
+export async function submitToRunpod(
+  env: any,
+  payload: {
+    prompt: string;
+    image: string;
+    ratio: string;
+    jobId: string;
+  }
+) {
+  const endpoint = `https://api.runpod.ai/v2/${env.RUNPOD_ENDPOINT_ID}/run`;
 
-export type RunpodRunResponse = {
-  id?: string;
-  status?: string; // IN_QUEUE / IN_PROGRESS / COMPLETED / FAILED (แล้วแต่ endpoint)
-  [k: string]: any;
-};
-
-export async function submitToRunpod(params: { prompt: string; imageUrl: string }, env: Env) {
-  const { prompt, imageUrl } = params;
-
-  if (!env.RUNPOD_API_KEY) throw new Error("Missing RUNPOD_API_KEY");
-  if (!env.RUNPOD_ENDPOINT_ID) throw new Error("Missing RUNPOD_ENDPOINT_ID");
-
-  const endpointId = env.RUNPOD_ENDPOINT_ID.trim();
-  const url = `https://api.runpod.ai/v2/${endpointId}/run`;
-
-  // ✅ IMPORTANT: Payload ที่ถูกต้องสำหรับ Qwen Image Edit
-  const payload = {
+  const body = {
     input: {
-      prompt,
-      image: imageUrl,
+      prompt: payload.prompt,
+      image: payload.image, // ✅ ใช้แค่นี้
+      ratio: payload.ratio,
     },
   };
 
-  const res = await fetch(url, {
+  const res = await fetch(endpoint, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${env.RUNPOD_API_KEY}`,
       "Content-Type": "application/json",
+      Authorization: `Bearer ${env.RUNPOD_API_KEY}`,
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(body),
   });
 
-  const text = await res.text();
-  let data: RunpodRunResponse | any = {};
-  try {
-    data = text ? JSON.parse(text) : {};
-  } catch {
-    data = { raw: text };
-  }
-
   if (!res.ok) {
-    // เอา body โชว์ชัด ๆ จะได้ debug ได้ทันที
-    throw new Error(`RunPod submit failed (${res.status}): ${JSON.stringify(data)}`);
+    const t = await res.text();
+    throw new Error(`RunPod submit failed (${res.status}): ${t}`);
   }
 
-  return data as RunpodRunResponse;
+  return await res.json();
 }
