@@ -1,43 +1,67 @@
-// src/routes/runpod.ts
-import type { Env } from "../index";
-import type { ExecutionContext } from "@cloudflare/workers-types";
 import { submitToRunPod } from "../services/runpod.service";
 
-function corsHeaders(origin?: string) {
-  return {
-    "Access-Control-Allow-Origin": origin || "*",
-    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
-  };
-}
-
-function json(data: unknown, status = 200, origin?: string) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { "content-type": "application/json; charset=utf-8", ...corsHeaders(origin) },
-  });
-}
-
-export async function handleRunpod(_request: Request, env: Env, _ctx: ExecutionContext, origin?: string) {
-  try {
-    // ดึงงานที่ UPLOADED (ยังไม่ submit)
-    const job = await env.DB.prepare(
-      `SELECT id, prompt, image_url FROM jobs WHERE status='UPLOADED' ORDER BY created_at ASC LIMIT 1`
-    ).first<any>();
-
-    if (!job) return json({ ok: true, message: "No UPLOADED jobs" }, 200, origin);
-
-    const runpod = await submitToRunpod({ prompt: job.prompt, imageUrl: job.image_url }, env);
-
-    await env.DB.prepare(
-      `UPDATE jobs SET status=?, runpod_id=?, updated_at=? WHERE id=?`
-    )
-      .bind(runpod.status || "IN_QUEUE", runpod.id || null, new Date().toISOString(), job.id)
-      .run();
-
-    return json({ ok: true, submitted: job.id, runpod }, 200, origin);
-  } catch (e: any) {
-    console.error(e);
-    return json({ ok: false, error: e?.message || String(e) }, 500, origin);
+export default async function runpodHandler(
+  request: Request,
+  env: any
+) {
+  if (request.method !== "POST") {
+    return new Response("Method Not Allowed", { status: 405 });
   }
+
+  const form = await request.formData();
+
+  const prompt = form.get("prompt") as string;
+  const ratio = (form.get("ratio") as string) || "1:1";
+  const model = (form.get("model") as string) || "qwen-image";
+  const imageFile = form.get("image") as File;
+
+  if (!prompt || !imageFile) {
+    return new Response(
+      JSON.stringify({ ok: false, error: "Missing prompt or image" }),
+      { status: 400 }
+    );
+  }
+
+  // upload input image to R2
+  const inputKey = `inputs/${crypto.randomUUID()}.png`;
+  const buffer = await imageFile.arrayBuffer();
+
+  await env.R2_RESULTS.put(inputKey, buffer, {
+    httpMetadata: { contentType: "image/png" },
+  });
+
+  const imageUrl = `https://cdn.obaistudio.com/${inputKey}`;
+
+  // create job id
+  const jobId = crypto.randomUUID();
+
+  await env.DB.prepare(
+    `INSERT INTO jobs
+     (id, status, prompt, model, ratio, image_url, created_at, updated_at)
+     VALUES (?, 'queued', ?, ?, ?, ?, ?, ?)`
+  )
+    .bind(
+      jobId,
+      prompt,
+      model,
+      ratio,
+      imageUrl,
+      Date.now(),
+      Date.now()
+    )
+    .run();
+
+  // submit to RunPod
+  await submitToRunPod(env, {
+    jobId,
+    prompt,
+    image: imageUrl,
+    ratio,
+    model,
+  });
+
+  return new Response(
+    JSON.stringify({ ok: true, jobId }),
+    { headers: { "Content-Type": "application/json" } }
+  );
 }
