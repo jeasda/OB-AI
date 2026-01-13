@@ -5,30 +5,26 @@ export async function submitToRunPod(
     image_url: string;
   }
 ) {
-  const res = await fetch(
-    `https://api.runpod.ai/v2/${env.RUNPOD_ENDPOINT_ID}/run`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${env.RUNPOD_API_KEY}`,
-      },
-      body: JSON.stringify({
-        input: {
-          prompt: payload.prompt,
-          image_url: payload.image_url,
-        },
-      }),
-    }
-  );
+  const res = await fetch(url, {
+  method: "POST",
+  headers,
+  body: JSON.stringify(payload),
+});
 
-  if (!res.ok) {
-    const t = await res.text();
-    throw new Error(`RunPod submit failed: ${res.status} ${t}`);
-  }
+const text = await res.text();
 
-  return res.json();
+if (!res.ok) {
+  throw new Error(`RunPod error ${res.status}: ${text}`);
 }
+
+let data;
+try {
+  data = JSON.parse(text);
+} catch {
+  throw new Error("RunPod response is not JSON");
+}
+
+return data;
 
 export async function getRunPodStatus(env: Env, jobId: string) {
   const res = await fetch(
