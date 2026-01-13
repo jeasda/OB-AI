@@ -29,23 +29,27 @@ export async function handleQueueCreate(request: Request, env: Env) {
 
       const imageFile = formData.get("image");
       if (imageFile && imageFile instanceof File) {
-        // Upload input to R2
+        console.log(`Uploading file: ${imageFile.name} (${imageFile.size} bytes)`);
+
+        if (!env.R2_RESULTS) {
+          throw new Error("R2_RESULTS binding is missing!");
+        }
+
         const fileId = crypto.randomUUID();
         const now = new Date();
         const year = now.getFullYear();
         const month = String(now.getMonth() + 1).padStart(2, '0');
-        // Simple extension detection or default to png
         const ext = imageFile.name.split('.').pop() || 'png';
         const r2Path = `uploads/${year}/${month}/${fileId}.${ext}`;
 
-        await env.R2_RESULTS.put(r2Path, imageFile.stream(), {
+        // Safer upload
+        const buffer = await imageFile.arrayBuffer();
+        await env.R2_RESULTS.put(r2Path, buffer, {
           httpMetadata: { contentType: imageFile.type }
         });
 
-        // Construct Public URL (e.g., https://cdn.obaistudio.com/...)
-        // For now, assume a standard public R2 or worker route. 
-        // Using a placeholder domain or the worker domain if configured.
         imageUrl = `https://cdn.obaistudio.com/${r2Path}`;
+        console.log(`Uploaded: ${imageUrl}`);
       }
     } else {
       // JSON Fallback (Legacy / Test)
