@@ -106,6 +106,7 @@ export async function handleQueueCreate(request: Request, env: Env, ctx: Executi
         console.log(`[Auto-Submit] Submitting job ${id} to RunPod...`);
         const { runpodSubmitJob } = await import("../services/runpod");
         const payload = { prompt, model, jobId: id, ratio, image_url: imageUrl, image: imageUrl };
+        console.log(`[Auto-Submit] Payload: ${JSON.stringify(payload)}`); // DEBUG
         const runpod = await runpodSubmitJob(env, payload);
 
         const now = nowISO();
