@@ -1,97 +1,43 @@
 // src/routes/runpod.ts
 import type { Env } from "../index";
-import { runpodSubmitJob } from "../services/runpod";
+import type { ExecutionContext } from "@cloudflare/workers-types";
+import { submitToRunpod } from "../services/runpod.service";
 
-function json(data: unknown, status = 200) {
+function corsHeaders(origin?: string) {
+  return {
+    "Access-Control-Allow-Origin": origin || "*",
+    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  };
+}
+
+function json(data: unknown, status = 200, origin?: string) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: {
-      "content-type": "application/json; charset=utf-8",
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization"
-    },
+    headers: { "content-type": "application/json; charset=utf-8", ...corsHeaders(origin) },
   });
 }
 
-function nowISO() {
-  return new Date().toISOString();
-}
-
-export async function handleRunpod(request: Request, env: Env) {
+export async function handleRunpod(_request: Request, env: Env, _ctx: ExecutionContext, origin?: string) {
   try {
-    const body = (await request.json().catch(() => null)) as
-      | { jobId?: string; prompt?: string; model?: string }
-      | null;
+    // ดึงงานที่ UPLOADED (ยังไม่ submit)
+    const job = await env.DB.prepare(
+      `SELECT id, prompt, image_url FROM jobs WHERE status='UPLOADED' ORDER BY created_at ASC LIMIT 1`
+    ).first<any>();
 
-    // โหมด A: ส่ง jobId มาเอง
-    let jobId = (body?.jobId || "").trim();
-    let prompt = (body?.prompt || "").trim();
-    let model = (body?.model || "").trim();
-    let ratio = "";
-    let imageUrl = "";
+    if (!job) return json({ ok: true, message: "No UPLOADED jobs" }, 200, origin);
 
-    // โหมด B: ถ้าไม่ส่ง jobId -> pick queued 1 งาน
-    if (!jobId) {
-      const picked = await env.DB.prepare(
-        `SELECT id, prompt, model, ratio, image_url FROM jobs WHERE status='queued' ORDER BY created_at ASC LIMIT 1`
-      ).all();
+    const runpod = await submitToRunpod({ prompt: job.prompt, imageUrl: job.image_url }, env);
 
-      const row = picked.results?.[0] as any;
-      if (!row) return json({ ok: true, message: "no queued job" });
-
-      jobId = row.id;
-      prompt = row.prompt;
-      model = row.model;
-      ratio = row.ratio || "1:1";
-      imageUrl = row.image_url || "";
-    } else {
-      // ถ้าส่ง jobId มา แต่ไม่ได้ส่ง prompt/model -> ดึงจาก DB
-      if (!prompt || !model) {
-        const r = await env.DB.prepare(
-          `SELECT prompt, model, ratio, image_url, status FROM jobs WHERE id = ? LIMIT 1`
-        )
-          .bind(jobId)
-          .first();
-
-        if (!r) return json({ ok: false, error: "jobId not found" }, 404);
-        if ((r as any).status !== "queued") {
-          return json({ ok: false, error: "job is not queued" }, 400);
-        }
-
-        prompt = prompt || (r as any).prompt;
-        model = model || (r as any).model;
-        ratio = (r as any).ratio || "1:1";
-        imageUrl = (r as any).image_url || "";
-      }
-    }
-
-    // ส่งไป Runpod
-    // Map data to match RunPod/ComfyUI expectations
-    const payload = {
-      prompt,
-      model,
-      jobId,
-      ratio,
-      image_url: imageUrl,
-      image: imageUrl // Send both to be safe
-    };
-
-    console.log("Submitting to RunPod w/ Payload:", JSON.stringify(payload));
-    const runpod = await runpodSubmitJob(env, payload);
-
-    // อัปเดต queue: running + runpod_job_id
-    const ts = nowISO();
     await env.DB.prepare(
-      `UPDATE jobs
-       SET runpod_job_id = ?, status = 'running', updated_at = ?
-       WHERE id = ?`
+      `UPDATE jobs SET status=?, runpod_id=?, updated_at=? WHERE id=?`
     )
-      .bind(runpod.id, ts, jobId)
+      .bind(runpod.status || "IN_QUEUE", runpod.id || null, new Date().toISOString(), job.id)
       .run();
 
-    return json({ ok: true, job_id: jobId, runpod: { id: runpod.id, status: runpod.status } });
+    return json({ ok: true, submitted: job.id, runpod }, 200, origin);
   } catch (e: any) {
-    return json({ ok: false, error: String(e?.message || e) }, 500);
+    console.error(e);
+    return json({ ok: false, error: e?.message || String(e) }, 500, origin);
   }
 }

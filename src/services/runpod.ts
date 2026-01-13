@@ -19,13 +19,19 @@ export async function runpodSubmitJob(
     throw new Error("RUNPOD env missing");
   }
 
+  const apiKey = env.RUNPOD_API_KEY.trim();
+  console.log(`[RunPod] Key: ${apiKey.slice(0, 5)}... (Length: ${apiKey.length})`);
+  console.log(`[RunPod] Endpoint: ${env.RUNPOD_ENDPOINT_ID}`);
+
   const url = `https://api.runpod.ai/v2/${env.RUNPOD_ENDPOINT_ID}/run`;
 
   const res = await fetch(url, {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${env.RUNPOD_API_KEY}`,
+      "Authorization": `Bearer ${apiKey}`,
       "Content-Type": "application/json",
+      "User-Agent": "RunPod-Client/1.0",
+      "Accept": "application/json"
     },
     body: JSON.stringify({
       input, // สำคัญ: RunPod ต้องครอบ input
