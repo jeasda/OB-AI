@@ -107,49 +107,15 @@ export async function handleQueueCreate(request: Request, env: Env, ctx: Executi
         const { runpodSubmitJob } = await import("../services/runpod");
         const { WORKFLOW_TEMPLATE } = await import("../lib/workflow");
 
-        // Clone workflow (Deep copy)
-        const workflow = JSON.parse(JSON.stringify(WORKFLOW_TEMPLATE));
-
-        // Inject Inputs
-        const INPUT_IMAGE_NAME = `job_${id}.png`;
-
-        // 1. Prompt Injection (Nodes 111, 348)
-        if (workflow["111"]?.inputs) workflow["111"].inputs.prompt = prompt;
-        if (workflow["348"]?.inputs) workflow["348"].inputs.prompt = prompt;
-
-        // 2. Image Injection (Nodes 78, 106, 108, 349)
-        // Set all to use the uploaded image name
-        const imageNodes = ["78", "106", "108", "349"];
-        for (const nodeId of imageNodes) {
-          if (workflow[nodeId]?.inputs) {
-            workflow[nodeId].inputs.image = INPUT_IMAGE_NAME;
-          }
-        }
-
-        // 3. Aspect Ratio / Resolution (Nodes 112, 345)
-        // Ratio: "1:1", "9:16", "16:9"
-        let w = 1024, h = 1024;
-        if (ratio === "9:16") { w = 768; h = 1344; }
-        else if (ratio === "16:9") { w = 1344; h = 768; }
-
-        if (workflow["112"]?.inputs) { workflow["112"].inputs.width = w; workflow["112"].inputs.height = h; }
-        if (workflow["345"]?.inputs) { workflow["345"].inputs.width = w; workflow["345"].inputs.height = h; }
-
-        // 4. Randomize Seed (Nodes 3, 340)
-        // Use a large random integer
-        const seed = Math.floor(Math.random() * 100000000000000);
-        if (workflow["3"]?.inputs) workflow["3"].inputs.seed = seed;
-        if (workflow["340"]?.inputs) workflow["340"].inputs.seed = seed;
-
-        // Construct Payload (Use 'prompt' key for API format)
+        // Construct Payload (Simplified - known to work in manual mode)
+        // runpodSubmitJob will wrap this in { input: ... }
         const finalPayload = {
-          prompt: workflow,
-          images: [
-            {
-              name: INPUT_IMAGE_NAME,
-              url: imageUrl
-            }
-          ]
+          prompt,
+          model,
+          jobId: id,
+          ratio,
+          image_url: imageUrl,
+          image: imageUrl
         };
 
         console.log(`[Auto-Submit] Payload keys: ${Object.keys(finalPayload)}`);
