@@ -1,25 +1,34 @@
+import { Env } from "../env";
 import {
   getRunPodStatus,
   extractOutputImageUrl,
 } from "../services/runpod.service";
 
-export async function handleRunpodPoll(req: Request, env: Env) {
-  const { searchParams } = new URL(req.url);
-  const jobId = searchParams.get("id");
+export async function handlePoll(
+  req: Request,
+  env: Env
+): Promise<Response> {
+  const url = new URL(req.url);
+  const jobId = url.searchParams.get("jobId");
 
   if (!jobId) {
-    return new Response("Missing job id", { status: 400 });
+    return Response.json({ ok: false, error: "Missing jobId" }, { status: 400 });
   }
 
   const status = await getRunPodStatus(env, jobId);
-  const imageUrl = extractOutputImageUrl(status);
 
-  return new Response(
-    JSON.stringify({
-      ok: true,
-      status,
-      imageUrl,
-    }),
-    { headers: { "Content-Type": "application/json" } }
-  );
+  if (status.status !== "COMPLETED") {
+    return Response.json({ ok: true, status: status.status });
+  }
+
+  const imageUrl = extractOutputImageUrl(status);
+  if (!imageUrl) {
+    return Response.json({ ok: false, error: "No output image" });
+  }
+
+  return Response.json({
+    ok: true,
+    status: "completed",
+    image: imageUrl,
+  });
 }

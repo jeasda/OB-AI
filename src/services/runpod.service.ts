@@ -1,81 +1,60 @@
-// src/services/runpod.service.ts
-
 import { Env } from "../env";
 
 const RUNPOD_BASE = "https://api.runpod.ai/v2";
 
-/**
- * Submit job to RunPod
- */
 export async function submitToRunPod(
   env: Env,
-  payload: Record<string, any>
+  payload: {
+    prompt: string;
+    image_url: string;
+    ratio: string;
+    model: string;
+  }
 ) {
-  const url = `${RUNPOD_BASE}/${env.RUNPOD_ENDPOINT_ID}/run`;
+  const res = await fetch(
+    `${RUNPOD_BASE}/${env.RUNPOD_ENDPOINT_ID}/run`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${env.RUNPOD_API_KEY}`,
+      },
+      body: JSON.stringify({
+        input: payload,
+      }),
+    }
+  );
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${env.RUNPOD_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-
-  const text = await res.text();
-
+  const json = await res.json<any>();
   if (!res.ok) {
-    throw new Error(`RunPod submit error ${res.status}: ${text}`);
+    throw new Error(JSON.stringify(json));
   }
 
-  let data: any;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    throw new Error("RunPod submit response is not JSON");
-  }
-
-  return data;
+  return json.id as string;
 }
 
-/**
- * Get job status from RunPod
- */
 export async function getRunPodStatus(env: Env, jobId: string) {
-  const url = `${RUNPOD_BASE}/${env.RUNPOD_ENDPOINT_ID}/status/${jobId}`;
+  const res = await fetch(
+    `${RUNPOD_BASE}/${env.RUNPOD_ENDPOINT_ID}/status/${jobId}`,
+    {
+      headers: {
+        Authorization: `Bearer ${env.RUNPOD_API_KEY}`,
+      },
+    }
+  );
 
-  const res = await fetch(url, {
-    headers: {
-      "Authorization": `Bearer ${env.RUNPOD_API_KEY}`,
-    },
-  });
-
-  const text = await res.text();
-
+  const json = await res.json<any>();
   if (!res.ok) {
-    throw new Error(`RunPod status error ${res.status}: ${text}`);
+    throw new Error(JSON.stringify(json));
   }
 
-  let data: any;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    throw new Error("RunPod status response is not JSON");
-  }
-
-  return data;
+  return json;
 }
 
-/**
- * Extract output image URL from RunPod result
- */
 export function extractOutputImageUrl(result: any): string | null {
-  if (!result) return null;
-
-  // รองรับหลายรูปแบบ เผื่อ model เปลี่ยน
   return (
-    result?.output?.image_url ||
-    result?.output?.images?.[0] ||
+    result?.output?.images?.[0] ??
+    result?.output?.image ??
     null
   );
 }
