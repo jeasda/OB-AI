@@ -48,6 +48,10 @@ export default {
       return handleRunpod(req, env);
     }
 
+    if (url.pathname === "/dev/runpod" && request.method === "POST") {
+      return handleRunpod(request, env);
+    }
+
     return json({ ok: false, error: "Not found" }, 404);
   },
 };

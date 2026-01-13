@@ -1,35 +1,46 @@
-export async function submitToRunpod(
-  env: any,
-  payload: {
-    prompt: string;
-    image: string;
-    ratio: string;
-    jobId: string;
+// src/services/runpod.service.ts
+export async function submitToRunPod(input: {
+  prompt: string;
+  image_url: string;
+  ratio: string;
+  model: string;
+}, env: {
+  RUNPOD_API_KEY: string;
+  RUNPOD_ENDPOINT_ID: string;
+}) {
+  if (!env.RUNPOD_API_KEY) {
+    throw new Error("Missing RUNPOD_API_KEY");
   }
-) {
+  if (!env.RUNPOD_ENDPOINT_ID) {
+    throw new Error("Missing RUNPOD_ENDPOINT_ID");
+  }
+
   const endpoint = `https://api.runpod.ai/v2/${env.RUNPOD_ENDPOINT_ID}/run`;
 
-  const body = {
+  // *** RunPod v2 expects: { input: {...} } ***
+  const payload = {
     input: {
-      prompt: payload.prompt,
-      image: payload.image, // ✅ ใช้แค่นี้
-      ratio: payload.ratio,
-    },
+      prompt: input.prompt,
+      image_url: input.image_url,
+      ratio: input.ratio,
+      model: input.model,
+    }
   };
 
   const res = await fetch(endpoint, {
     method: "POST",
     headers: {
+      "Authorization": `Bearer ${env.RUNPOD_API_KEY}`,
       "Content-Type": "application/json",
-      Authorization: `Bearer ${env.RUNPOD_API_KEY}`,
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify(payload),
   });
 
+  const text = await res.text();
+
   if (!res.ok) {
-    const t = await res.text();
-    throw new Error(`RunPod submit failed (${res.status}): ${t}`);
+    throw new Error(`RunPod submit failed (${res.status}): ${text}`);
   }
 
-  return await res.json();
+  return JSON.parse(text);
 }
