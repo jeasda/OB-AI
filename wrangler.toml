@@ -7,6 +7,9 @@ binding = "DB"
 database_name = "obai"
 database_id = "d4c9a2fb-0635-4fcb-bd48-e8faa1a6ae21"
 
+[vars]
+RUNPOD_ENDPOINT_ID = "i3qcf6gz8v495h"
+
 [triggers]
 crons = ["* * * * *"] # Run every 1 minute
 
