@@ -28,8 +28,9 @@ export async function handleQueueCreate(request: Request, env: Env) {
       model = (formData.get("model") as string || "qwen-image").trim();
 
       const imageFile = formData.get("image");
-      if (imageFile && imageFile instanceof File) {
-        console.log(`Uploading file: ${imageFile.name} (${imageFile.size} bytes)`);
+      // Loose check: it's an object and has arrayBuffer method
+      if (imageFile && typeof imageFile === 'object' && 'arrayBuffer' in imageFile) {
+        console.log(`Processing upload...`);
 
         if (!env.R2_RESULTS) {
           throw new Error("R2_RESULTS binding is missing!");
@@ -39,13 +40,20 @@ export async function handleQueueCreate(request: Request, env: Env) {
         const now = new Date();
         const year = now.getFullYear();
         const month = String(now.getMonth() + 1).padStart(2, '0');
-        const ext = imageFile.name.split('.').pop() || 'png';
+        // @ts-ignore
+        const fileName = imageFile.name || "upload.png";
+        // @ts-ignore
+        const fileType = imageFile.type || "image/png";
+
+        const ext = fileName.split('.').pop() || 'png';
         const r2Path = `uploads/${year}/${month}/${fileId}.${ext}`;
 
         // Safer upload
+        // @ts-ignore
         const buffer = await imageFile.arrayBuffer();
+
         await env.R2_RESULTS.put(r2Path, buffer, {
-          httpMetadata: { contentType: imageFile.type }
+          httpMetadata: { contentType: fileType }
         });
 
         imageUrl = `https://cdn.obaistudio.com/${r2Path}`;
