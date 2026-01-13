@@ -1,48 +1,21 @@
-import { Env } from "../index";
-import { nanoid } from "nanoid";
+import { submitToRunPod } from "../services/runpod.service";
 
 export async function handleQueueCreate(req: Request, env: Env) {
   const form = await req.formData();
 
   const prompt = form.get("prompt") as string;
-  const ratio = form.get("ratio") as string;
-  const model = form.get("model") as string;
-  const image = form.get("image") as File;
+  const imageUrl = form.get("image_url") as string;
 
-  if (!prompt || !image) {
-    return Response.json({ ok: false, error: "Missing prompt or image" }, { status: 400 });
-  }
-
-  const jobId = nanoid();
-  const now = Date.now();
-
-  const imageUrl = `https://cdn.obaistudio.com/uploads/${jobId}.png`;
-
-  await env.DB.prepare(
-    `INSERT INTO jobs
-     (id, status, prompt, model, ratio, image_url, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-  ).bind(
-    jobId,
-    "queued",
+  const result = await submitToRunPod(env, {
     prompt,
-    model,
-    ratio,
-    imageUrl,
-    now,
-    now
-  ).run();
+    image_url: imageUrl,
+  });
 
-  return Response.json({ ok: true, jobId });
-}
-
-export async function handleQueueStatus(req: Request, env: Env) {
-  const id = new URL(req.url).searchParams.get("id");
-
-  const row = await env.DB
-    .prepare(`SELECT * FROM jobs WHERE id = ?`)
-    .bind(id)
-    .first();
-
-  return Response.json({ ok: true, job: row });
+  return new Response(
+    JSON.stringify({
+      ok: true,
+      jobId: result.id,
+    }),
+    { headers: { "Content-Type": "application/json" } }
+  );
 }

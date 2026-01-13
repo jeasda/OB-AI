@@ -5,60 +5,49 @@ export async function submitToRunPod(
     image_url: string;
   }
 ) {
-  const url = `https://api.runpod.ai/v2/${env.RUNPOD_ENDPOINT_ID}/run`;
-
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${env.RUNPOD_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      input: {
-        prompt: payload.prompt,
-        image: payload.image_url,
+  const res = await fetch(
+    `https://api.runpod.ai/v2/${env.RUNPOD_ENDPOINT_ID}/run`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${env.RUNPOD_API_KEY}`,
       },
-    }),
-  });
-
-  const text = await res.text();
-
-  if (!res.ok) {
-    throw new Error(`RunPod submit failed (${res.status}): ${text}`);
-  }
-
-  return JSON.parse(text);
-}
-
-export async function getRunPodStatus(
-  env: Env,
-  runpodJobId: string
-) {
-  const url = `https://api.runpod.ai/v2/${env.RUNPOD_ENDPOINT_ID}/status/${runpodJobId}`;
-
-  const res = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${env.RUNPOD_API_KEY}`,
-    },
-  });
-
-  const text = await res.text();
+      body: JSON.stringify({
+        input: {
+          prompt: payload.prompt,
+          image_url: payload.image_url,
+        },
+      }),
+    }
+  );
 
   if (!res.ok) {
-    throw new Error(`RunPod status failed (${res.status}): ${text}`);
+    const t = await res.text();
+    throw new Error(`RunPod submit failed: ${res.status} ${t}`);
   }
 
-  return JSON.parse(text);
+  return res.json();
 }
 
-export function extractOutputImageUrl(runpodResult: any): string | null {
-  try {
-    return (
-      runpodResult?.output?.image_url ||
-      runpodResult?.output?.images?.[0] ||
-      null
-    );
-  } catch {
-    return null;
+export async function getRunPodStatus(env: Env, jobId: string) {
+  const res = await fetch(
+    `https://api.runpod.ai/v2/${env.RUNPOD_ENDPOINT_ID}/status/${jobId}`,
+    {
+      headers: {
+        Authorization: `Bearer ${env.RUNPOD_API_KEY}`,
+      },
+    }
+  );
+
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error(`RunPod status failed: ${res.status} ${t}`);
   }
+
+  return res.json();
+}
+
+export function extractOutputImageUrl(status: any): string | null {
+  return status?.output?.image_url ?? null;
 }
