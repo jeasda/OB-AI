@@ -1,60 +1,37 @@
-import { Env } from "../env";
-
-const RUNPOD_BASE = "https://api.runpod.ai/v2";
-
 export async function submitToRunPod(
   env: Env,
   payload: {
     prompt: string;
-    image_url: string;
-    ratio: string;
-    model: string;
+    ratio?: string;
+    model?: string;
+    image: File;
   }
-) {
+): Promise<string> {
+  const body = {
+    input: {
+      prompt: payload.prompt,
+      ratio: payload.ratio ?? "9:16",
+      model: payload.model ?? "qwen-image",
+    },
+  };
+
   const res = await fetch(
-    `${RUNPOD_BASE}/${env.RUNPOD_ENDPOINT_ID}/run`,
+    `https://api.runpod.ai/v2/${env.RUNPOD_ENDPOINT_ID}/run`,
     {
       method: "POST",
       headers: {
+        Authorization: `Bearer ${env.RUNPOD_API_KEY}`,
         "Content-Type": "application/json",
-        Authorization: `Bearer ${env.RUNPOD_API_KEY}`,
       },
-      body: JSON.stringify({
-        input: payload,
-      }),
+      body: JSON.stringify(body),
     }
   );
 
-  const json = await res.json<any>();
   if (!res.ok) {
-    throw new Error(JSON.stringify(json));
+    const t = await res.text();
+    throw new Error(`RunPod submit failed: ${t}`);
   }
 
-  return json.id as string;
-}
-
-export async function getRunPodStatus(env: Env, jobId: string) {
-  const res = await fetch(
-    `${RUNPOD_BASE}/${env.RUNPOD_ENDPOINT_ID}/status/${jobId}`,
-    {
-      headers: {
-        Authorization: `Bearer ${env.RUNPOD_API_KEY}`,
-      },
-    }
-  );
-
-  const json = await res.json<any>();
-  if (!res.ok) {
-    throw new Error(JSON.stringify(json));
-  }
-
-  return json;
-}
-
-export function extractOutputImageUrl(result: any): string | null {
-  return (
-    result?.output?.images?.[0] ??
-    result?.output?.image ??
-    null
-  );
+  const json: any = await res.json();
+  return json.id;
 }

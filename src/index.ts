@@ -1,23 +1,24 @@
-import { Env } from "./env";
-import { handleQueue } from "./routes/queue";
-import { handlePoll } from "./routes/runpod-poll";
+import { handleQueueCreate } from "./routes/queue";
 
 export default {
-  async fetch(req: Request, env: Env): Promise<Response> {
-    const url = new URL(req.url);
+  async fetch(request: Request, env: Env): Promise<Response> {
+    try {
+      const url = new URL(request.url);
 
-    if (req.method === "POST" && url.pathname === "/api/queue/create") {
-      return handleQueue(req, env);
+      if (request.method === "POST" && url.pathname === "/api/queue/create") {
+        return handleQueueCreate(request, env);
+      }
+
+      return new Response(
+        JSON.stringify({ ok: true, service: "ob-ai-api", status: "running" }),
+        { headers: { "content-type": "application/json" } }
+      );
+    } catch (err: any) {
+      console.error("FATAL", err);
+      return new Response(
+        JSON.stringify({ ok: false, error: err?.message || "internal error" }),
+        { status: 500 }
+      );
     }
-
-    if (req.method === "GET" && url.pathname === "/api/runpod/poll") {
-      return handlePoll(req, env);
-    }
-
-    if (url.pathname === "/") {
-      return Response.json({ ok: true, service: "ob-ai-api" });
-    }
-
-    return new Response("Not Found", { status: 404 });
   },
 };
