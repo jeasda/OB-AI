@@ -35,6 +35,7 @@ const elements = {
   beforeImage: document.getElementById('before-image'),
   optionsSlot: document.getElementById('options-slot'),
   ratioSlot: document.getElementById('ratio-slot'),
+  promptInput: document.getElementById('prompt-input'),
   submitBtn: document.getElementById('submit-btn'),
   inlineError: document.getElementById('inline-error'),
   marketingPanel: document.getElementById('marketing-panel'),
@@ -62,6 +63,9 @@ let pollController = null
 let currentResultUrl = ''
 let pendingSubmit = false
 let jobStartAt = 0
+let isDrawing = false
+let hasMask = false
+let lastPoint = null
 
 const savedOptions = loadOptions()
 machine.context.options = { ...defaultOptions, ...savedOptions }
@@ -218,6 +222,10 @@ elements.downloadBtn.addEventListener('click', downloadResult)
 
 elements.retryBtn.addEventListener('click', () => dispatch({ type: Events.retry }))
 
+elements.promptInput.addEventListener('input', () => {
+  machine.context.promptText = elements.promptInput.value.trim()
+})
+
 function updateOption(key, value) {
   dispatch({ type: Events.setOption, key, value })
   if (key === 'location') {
@@ -286,6 +294,7 @@ function handleFile(file) {
   elements.previewThumb.classList.remove('hidden')
   elements.beforeImage.src = elements.previewThumb.src
   elements.beforePanel.classList.remove('hidden')
+  setupMaskCanvas()
   showInlineError('')
   updateOption('ratio', machine.context.options.ratio)
 }
@@ -296,6 +305,12 @@ function handleSubmit() {
 
   if (!machine.context.imageFile) {
     showInlineError('กรุณาอัปโหลดภาพก่อนเริ่มแก้ไข')
+    return
+  }
+
+  if (!machine.context.hasMask) {
+    showInlineError('กรุณาระบายบริเวณที่ต้องการแก้ไขก่อน')
+    showError('กรุณาระบายบริเวณที่ต้องการแก้ไขก่อน')
     return
   }
 
@@ -323,8 +338,9 @@ async function submitJob() {
   progressPanel.setStep(0)
 
   const promptPayload = buildPromptV1(machine.context.options, 'th')
+  const userPrompt = machine.context.promptText ? ` ${machine.context.promptText}` : ''
   const formData = new FormData()
-  formData.append('prompt', promptPayload.prompt)
+  formData.append('prompt', `${promptPayload.prompt}${userPrompt}`)
   formData.append('ratio', machine.context.options.ratio)
   formData.append('model', 'qwen-image')
   formData.append('service', 'qwen-image-edit')
@@ -440,6 +456,11 @@ function render() {
 
   elements.submitBtn.disabled = !flags.canSubmit
   elements.marketingPanel.classList.toggle('hidden', flags.showProgress || flags.showResult)
+  const maskHint = document.getElementById('mask-hint')
+  if (maskHint) {
+    const showHint = !!machine.context.imageFile && !machine.context.hasMask
+    maskHint.classList.toggle('hidden', !showHint)
+  }
 
   if (!flags.showProgress) {
     progressPanel.hide()
@@ -501,6 +522,7 @@ function setControlsDisabled(disabled) {
   elements.fileInput.disabled = disabled
   elements.uploadZone.classList.toggle('is-disabled', disabled)
   elements.submitBtn.disabled = disabled || !hasImage || !deriveFlags(machine.state, machine.context).canSubmit
+  elements.promptInput.disabled = disabled || !machine.context.hasMask
 
   const selects = elements.optionsSlot.querySelectorAll('select')
   selects.forEach((select) => {
@@ -541,6 +563,87 @@ function updateStatePill(state) {
     [States.downloading]: 'กำลังดาวน์โหลด'
   }
   elements.statePill.textContent = labels[state] || 'สถานะไม่ทราบ'
+}
+
+function setupMaskCanvas() {
+  const canvas = document.getElementById('mask-canvas')
+  const img = elements.beforeImage
+  if (!canvas || !img) return
+
+  const resize = () => {
+    canvas.width = img.clientWidth
+    canvas.height = img.clientHeight
+  }
+
+  img.onload = () => {
+    resize()
+    clearMask()
+  }
+
+  resize()
+  clearMask()
+
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+
+  ctx.lineWidth = 24
+  ctx.lineJoin = 'round'
+  ctx.lineCap = 'round'
+  ctx.strokeStyle = 'rgba(16, 185, 129, 0.5)'
+
+  const startDraw = (event) => {
+    isDrawing = true
+    lastPoint = getPoint(event)
+  }
+
+  const draw = (event) => {
+    if (!isDrawing || !ctx) return
+    const point = getPoint(event)
+    ctx.beginPath()
+    ctx.moveTo(lastPoint.x, lastPoint.y)
+    ctx.lineTo(point.x, point.y)
+    ctx.stroke()
+    lastPoint = point
+    if (!hasMask) {
+      hasMask = true
+      dispatch({ type: Events.maskDrawn })
+    }
+  }
+
+  const endDraw = () => {
+    isDrawing = false
+    lastPoint = null
+  }
+
+  canvas.onmousedown = startDraw
+  canvas.onmousemove = draw
+  canvas.onmouseup = endDraw
+  canvas.onmouseleave = endDraw
+
+  canvas.ontouchstart = (event) => startDraw(event.touches[0])
+  canvas.ontouchmove = (event) => {
+    event.preventDefault()
+    draw(event.touches[0])
+  }
+  canvas.ontouchend = endDraw
+}
+
+function getPoint(event) {
+  const rect = document.getElementById('mask-canvas').getBoundingClientRect()
+  return {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top
+  }
+}
+
+function clearMask() {
+  const canvas = document.getElementById('mask-canvas')
+  if (!canvas) return
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  hasMask = false
+  dispatch({ type: Events.maskCleared })
 }
 
 function persistOptions() {

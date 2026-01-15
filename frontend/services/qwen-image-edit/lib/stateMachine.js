@@ -13,6 +13,8 @@ export const Events = {
   uploadImage: 'UPLOAD_IMAGE',
   removeImage: 'REMOVE_IMAGE',
   setOption: 'SET_OPTION',
+  maskDrawn: 'MASK_DRAWN',
+  maskCleared: 'MASK_CLEARED',
   openPayment: 'OPEN_PAYMENT',
   confirmPay: 'CONFIRM_PAY',
   cancelPay: 'CANCEL_PAY',
@@ -51,6 +53,8 @@ export function createInitialContext(defaults) {
     paymentConfirmed: false,
     payMethod: null,
     downloadInProgress: false,
+    hasMask: false,
+    promptText: '',
     lastEventAt: Date.now()
   }
 }
@@ -73,6 +77,8 @@ export function transition(state, context, event) {
       nextContext.error = null
       nextContext.errorType = null
       nextContext.resultUrl = null
+      nextContext.hasMask = false
+      nextContext.promptText = ''
       nextState = States.imageUploaded
       break
     }
@@ -87,7 +93,21 @@ export function transition(state, context, event) {
     }
     case Events.setOption: {
       nextContext.options = { ...nextContext.options, [event.key]: event.value }
+      nextState = nextContext.imageFile
+        ? (nextContext.hasMask ? States.readyToGenerate : States.imageUploaded)
+        : States.idle
+      break
+    }
+    case Events.maskDrawn: {
+      nextContext.hasMask = true
+      nextContext.error = null
+      nextContext.errorType = null
       nextState = nextContext.imageFile ? States.readyToGenerate : States.idle
+      break
+    }
+    case Events.maskCleared: {
+      nextContext.hasMask = false
+      nextState = nextContext.imageFile ? States.imageUploaded : States.idle
       break
     }
     case Events.openPayment: {
@@ -103,7 +123,9 @@ export function transition(state, context, event) {
     case Events.cancelPay: {
       nextContext.paymentConfirmed = false
       nextContext.payMethod = null
-      nextState = nextContext.imageFile ? States.readyToGenerate : States.idle
+      nextState = nextContext.imageFile
+        ? (nextContext.hasMask ? States.readyToGenerate : States.imageUploaded)
+        : States.idle
       break
     }
     case Events.submit: {
@@ -147,7 +169,9 @@ export function transition(state, context, event) {
       nextContext.jobId = null
       nextContext.error = null
       nextContext.errorType = null
-      nextState = nextContext.imageFile ? States.readyToGenerate : States.idle
+      nextState = nextContext.imageFile
+        ? (nextContext.hasMask ? States.readyToGenerate : States.imageUploaded)
+        : States.idle
       break
     }
     case Events.downloadStart: {

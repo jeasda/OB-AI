@@ -48,6 +48,11 @@
           <div id="options-slot" class="panel-section"></div>
         </div>
 
+        <div class="panel-section">
+          <label class="field-label" for="prompt-input">เขียนสิ่งที่อยากแก้ไข</label>
+          <textarea id="prompt-input" class="prompt-input" rows="3" placeholder="เช่น เปลี่ยนชุดเป็นชุดไปเที่ยว แสงอุ่นๆ"></textarea>
+        </div>
+
         <div id="ratio-slot" class="panel-section"></div>
 
         <details id="prompt-preview" class="panel">
@@ -88,7 +93,11 @@
 
         <div id="before-after" class="panel hidden">
           <div class="panel-title">ภาพต้นฉบับ</div>
-          <img id="before-image" alt="before" class="upload-thumb">
+          <div class="mask-stage">
+            <img id="before-image" alt="before" class="upload-thumb">
+            <canvas id="mask-canvas" class="mask-canvas"></canvas>
+            <div id="mask-hint" class="mask-hint">ระบายส่วนที่ต้องการแก้ไข</div>
+          </div>
         </div>
 
         <div id="progress-slot"></div>
