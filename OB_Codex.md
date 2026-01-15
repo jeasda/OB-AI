@@ -364,3 +364,29 @@ User/Client
 ### Notes
 - Known non-blocking limitations
 - Safe next steps
+## 2026-01-16 0325 Pages Deployment Branch Created
+
+Objective
+- Ensure Vite frontend is built and served correctly by Cloudflare Pages
+
+Actions Performed
+- Build verification
+- Config fixes
+- Docs added
+
+Commands Executed
+- npm install
+- npm run build
+
+Validation
+- dist/ exists
+- dist/index.html exists
+- dist/assets hashed files exist
+- Pages UI redeploy still required
+
+Runtime Status
+- Local build OK
+- Pages deploy Pending
+
+Notes for Next Session
+- Redeploy Cloudflare Pages from pages-qwen-frontend using root frontend/services/qwen-image-edit and build command npm install && npm run build
