@@ -41,6 +41,8 @@ const elements = {
   progressSlot: document.getElementById('progress-slot'),
   resultSlot: document.getElementById('result-slot'),
   errorPanel: document.getElementById('error-panel'),
+  errorText: document.getElementById('error-text'),
+  retryBtn: document.getElementById('retry-btn'),
   downloadBtn: document.getElementById('download-btn'),
   generateNewBtn: document.getElementById('generate-new-btn'),
   statePill: document.getElementById('state-pill'),
@@ -57,8 +59,6 @@ let machine = {
 
 let pollTimer = null
 let pollController = null
-let progressTimer = null
-let progressValue = 0
 let currentResultUrl = ''
 let pendingSubmit = false
 let jobStartAt = 0
@@ -216,6 +216,8 @@ elements.generateNewBtn.addEventListener('click', handleGenerateAgain)
 
 elements.downloadBtn.addEventListener('click', downloadResult)
 
+elements.retryBtn.addEventListener('click', () => dispatch({ type: Events.retry }))
+
 function updateOption(key, value) {
   dispatch({ type: Events.setOption, key, value })
   if (key === 'location') {
@@ -314,10 +316,9 @@ function handleSubmit() {
 }
 
 async function submitJob() {
-  progressValue = 0
   progressPanel.setProgress(0)
-  progressPanel.setTitle('เตรียมภาพ')
-  progressPanel.setNote('กำลังเตรียมข้อมูลและส่งงาน')
+  progressPanel.setTitle('กำลังส่งงาน')
+  progressPanel.setNote('กำลังส่งภาพไปยังระบบประมวลผล')
   progressPanel.setStep(0)
 
   const promptPayload = buildPromptV1(machine.context.options, 'th')
@@ -337,7 +338,7 @@ async function submitJob() {
 
     const data = await res.json()
     if (!res.ok || !data.ok) {
-      throw new Error(data.error || 'เริ่มงานไม่สำเร็จ')
+      throw new Error('เริ่มงานไม่สำเร็จ กรุณาลองใหม่')
     }
 
     const jobId = data.job_id || data.jobId || data.job?.id
@@ -345,8 +346,8 @@ async function submitJob() {
 
     jobStartAt = Date.now()
     dispatch({ type: Events.jobAccepted, jobId })
-  } catch (error) {
-    dispatch({ type: Events.jobFailed, error: error.message || 'เชื่อมต่อไม่สำเร็จ' })
+  } catch {
+    dispatch({ type: Events.jobFailed, error: 'เชื่อมต่อระบบไม่สำเร็จ กรุณาลองใหม่' })
   }
 }
 
@@ -381,8 +382,9 @@ async function checkStatus() {
 
     if (!res.ok || !data.ok) {
       if (data?.job?.status === 'failed') {
-        throw new Error(data?.job?.error || data?.error || 'งานล้มเหลว')
+        throw new Error('งานล้มเหลว กรุณาลองใหม่อีกครั้ง')
       }
+      updateProgressByStatus('queued')
       return
     }
 
@@ -392,38 +394,34 @@ async function checkStatus() {
       if (!resultUrl) throw new Error('ไม่พบผลลัพธ์')
       dispatch({ type: Events.jobCompleted, resultUrl })
     } else if (status === 'failed') {
-      throw new Error(data?.job?.error || 'งานล้มเหลว')
+      throw new Error('งานล้มเหลว กรุณาลองใหม่อีกครั้ง')
     } else {
-      progressPanel.setNote('ยังทำงานอยู่ โปรดรอสักครู่')
+      updateProgressByStatus(status)
     }
   } catch (error) {
-    dispatch({ type: Events.jobFailed, error: error.message || 'เชื่อมต่อไม่สำเร็จ' })
+    dispatch({ type: Events.jobFailed, error: error.message || 'เกิดข้อผิดพลาด กรุณาลองใหม่' })
   }
 }
 
-function startProgressLoop() {
-  if (progressTimer) clearInterval(progressTimer)
-  progressTimer = setInterval(() => {
-    if (progressValue >= 98) return
-    progressValue += progressValue < 40 ? 2 : progressValue < 75 ? 1 : 0.3
-    progressPanel.setProgress(progressValue)
-
-    if (progressValue < 33) {
-      progressPanel.setTitle('เตรียมภาพ')
-      progressPanel.setStep(0)
-    } else if (progressValue < 70) {
-      progressPanel.setTitle('ประมวลผล')
-      progressPanel.setStep(1)
-    } else {
-      progressPanel.setTitle('เก็บรายละเอียด')
-      progressPanel.setStep(2)
-    }
-  }, 200)
-}
-
-function stopProgressLoop() {
-  if (progressTimer) clearInterval(progressTimer)
-  progressTimer = null
+function updateProgressByStatus(status) {
+  if (status === 'queued') {
+    progressPanel.setTitle('รอคิว GPU')
+    progressPanel.setNote('กำลังรอคิวประมวลผลบน GPU')
+    progressPanel.setProgress(20)
+    progressPanel.setStep(0)
+    return
+  }
+  if (status === 'running') {
+    progressPanel.setTitle('กำลังประมวลผล')
+    progressPanel.setNote('ระบบกำลังสร้างภาพให้คุณ')
+    progressPanel.setProgress(60)
+    progressPanel.setStep(1)
+    return
+  }
+  progressPanel.setTitle('เก็บรายละเอียด')
+  progressPanel.setNote('กำลังปรับรายละเอียดขั้นสุดท้าย')
+  progressPanel.setProgress(85)
+  progressPanel.setStep(2)
 }
 
 function handleGenerateAgain() {
@@ -432,7 +430,7 @@ function handleGenerateAgain() {
 }
 
 function showError(message) {
-  elements.errorPanel.textContent = message
+  elements.errorText.textContent = message
   elements.errorPanel.classList.remove('hidden')
 }
 
@@ -462,7 +460,6 @@ function render() {
 
 function handleStateChange(prevState, prevContext, nextState, nextContext) {
   if (nextState === States.generating && prevState !== States.generating) {
-    startProgressLoop()
     progressPanel.show()
     submitJob()
   }
@@ -476,7 +473,6 @@ function handleStateChange(prevState, prevContext, nextState, nextContext) {
   }
 
   if (nextState === States.completed) {
-    stopProgressLoop()
     progressPanel.setProgress(100)
     progressPanel.setTitle('เสร็จแล้ว')
     progressPanel.setStep(2)
@@ -489,7 +485,6 @@ function handleStateChange(prevState, prevContext, nextState, nextContext) {
 
   if (nextState === States.error) {
     stopPolling()
-    stopProgressLoop()
   }
 }
 
@@ -521,7 +516,6 @@ function showInlineError(message) {
 function updateCreditsUI() {
   const credits = getCredits()
   elements.creditPill.textContent = `เครดิตคงเหลือ ${credits}`
-  elements.creditPill.classList.remove('hidden')
   elements.creditRail.textContent = `เครดิตคงเหลือ ${credits}`
 }
 
@@ -582,8 +576,7 @@ async function downloadResult() {
       sourceBlob = await res.blob()
     }
 
-    const watermarkedBlob = await addWatermark(sourceBlob)
-    triggerDownload(watermarkedBlob, 'qwen-image-edit-watermarked.png')
+    triggerDownload(sourceBlob, 'qwen-image-edit.png')
   } catch {
     showInlineError('ดาวน์โหลดไม่สำเร็จ กรุณาลองใหม่')
   } finally {
@@ -601,56 +594,6 @@ function dataUrlToBlob(dataUrl) {
     bytes[i] = binary.charCodeAt(i)
   }
   return new Blob([bytes], { type: mime })
-}
-
-function addWatermark(blob) {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    const url = URL.createObjectURL(blob)
-    img.onload = () => {
-      const canvas = document.createElement('canvas')
-      canvas.width = img.naturalWidth
-      canvas.height = img.naturalHeight
-      const ctx = canvas.getContext('2d')
-      if (!ctx) {
-        URL.revokeObjectURL(url)
-        reject(new Error('canvas_context'))
-        return
-      }
-      ctx.drawImage(img, 0, 0)
-
-      const padding = Math.max(24, Math.floor(canvas.width * 0.03))
-      const fontSize = Math.max(18, Math.floor(canvas.width * 0.02))
-      ctx.font = `${fontSize}px sans-serif`
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.6)'
-      ctx.textBaseline = 'bottom'
-
-      const text = 'OB AI Studio'
-      const metrics = ctx.measureText(text)
-      const badgeWidth = metrics.width + padding * 1.5
-      const badgeHeight = fontSize + padding * 0.8
-      const x = canvas.width - badgeWidth - padding
-      const y = canvas.height - padding
-
-      ctx.fillRect(x, y - badgeHeight, badgeWidth, badgeHeight)
-      ctx.fillStyle = 'rgba(226, 232, 240, 0.9)'
-      ctx.fillText(text, x + padding * 0.6, y - padding * 0.3)
-
-      canvas.toBlob((result) => {
-        URL.revokeObjectURL(url)
-        if (!result) {
-          reject(new Error('watermark_failed'))
-          return
-        }
-        resolve(result)
-      }, 'image/png')
-    }
-    img.onerror = () => {
-      URL.revokeObjectURL(url)
-      reject(new Error('image_load_failed'))
-    }
-    img.src = url
-  })
 }
 
 function triggerDownload(blob, filename) {

@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "wrangler dev --local",
     "dev:frontend": "vite",
-    "build": "vite build",
+    "buildfrontend": "vite build",
+    "build": "npm run buildfrontend",
     "preview": "vite preview",
     "deploy": "wrangler deploy",
     "lint": "eslint .",
