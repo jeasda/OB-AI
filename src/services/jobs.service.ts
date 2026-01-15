@@ -1,63 +1,64 @@
 import type { Env } from "../env";
+import { createJobTimestamp } from "./job_timestamps.service";
 
 export type JobRow = {
   id: string;
-  status: string;
-  prompt: string | null;
-  model: string | null;
-  ratio: string | null;
-  image_url: string | null;
-  runpod_job_id: string | null;
-  output_image_url: string | null;
-  error_message: string | null;
-  created_at: number;
-  updated_at: number;
+  created_at: string;
+  status: "queued" | "running" | "completed" | "failed";
+  runpod_id?: string | null;
+  result_key?: string | null;
+  error?: string | null;
 };
 
-export async function createJob(env: Env, row: Partial<JobRow> & { id: string }) {
-  const now = Date.now();
-  const stmt = env.DB.prepare(
-    `INSERT INTO jobs (
-      id, status, prompt, model, ratio, image_url, runpod_job_id, output_image_url, error_message, created_at, updated_at
-    ) VALUES (
-      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-    )`
-  ).bind(
-    row.id,
-    row.status ?? "queued",
-    row.prompt ?? null,
-    row.model ?? null,
-    row.ratio ?? null,
-    row.image_url ?? null,
-    row.runpod_job_id ?? null,
-    row.output_image_url ?? null,
-    row.error_message ?? null,
-    now,
-    now
-  );
-
-  await stmt.run();
+export async function initDb(env: Env) {
+  await env.DB.exec(`
+    CREATE TABLE IF NOT EXISTS jobs (
+      id TEXT PRIMARY KEY,
+      created_at TEXT NOT NULL,
+      status TEXT NOT NULL,
+      runpod_id TEXT,
+      result_key TEXT,
+      error TEXT
+    );
+  `);
 }
 
-export async function updateJob(env: Env, id: string, patch: Partial<JobRow>) {
-  const now = Date.now();
-  const fields: string[] = [];
-  const values: any[] = [];
+export async function createJob(env: Env): Promise<JobRow> {
+  const id = crypto.randomUUID();
+  const created_at = new Date().toISOString();
+  const createdAtMs = Date.now();
+  const status: JobRow["status"] = "queued";
+  await env.DB.prepare(
+    "INSERT INTO jobs (id, created_at, status) VALUES (?, ?, ?)"
+  ).bind(id, created_at, status).run();
+  await createJobTimestamp(env, {
+    job_id: id,
+    created_at_ms: createdAtMs,
+  });
+  return { id, created_at, status };
+}
 
-  for (const [k, v] of Object.entries(patch)) {
-    fields.push(`${k} = ?`);
-    values.push(v);
-  }
-  fields.push("updated_at = ?");
-  values.push(now);
+export async function setRunPodId(env: Env, id: string, runpodId: string) {
+  await env.DB.prepare("UPDATE jobs SET runpod_id = ?, status = 'running' WHERE id = ?")
+    .bind(runpodId, id).run();
+}
 
-  values.push(id);
+export async function completeJob(env: Env, id: string, resultKey: string) {
+  await env.DB.prepare("UPDATE jobs SET status = 'completed', result_key = ?, error = NULL WHERE id = ?")
+    .bind(resultKey, id).run();
+}
 
-  const sql = `UPDATE jobs SET ${fields.join(", ")} WHERE id = ?`;
-  await env.DB.prepare(sql).bind(...values).run();
+export async function failJob(env: Env, id: string, error: string) {
+  await env.DB.prepare("UPDATE jobs SET status = 'failed', error = ? WHERE id = ?")
+    .bind(error, id).run();
 }
 
 export async function getJob(env: Env, id: string): Promise<JobRow | null> {
-  const r = await env.DB.prepare(`SELECT * FROM jobs WHERE id = ?`).bind(id).first<JobRow>();
-  return r ?? null;
+  const res = await env.DB.prepare("SELECT * FROM jobs WHERE id = ?").bind(id).first();
+  return (res as any) || null;
+}
+
+export async function getJobByRunpodId(env: Env, runpodId: string): Promise<JobRow | null> {
+  const res = await env.DB.prepare("SELECT * FROM jobs WHERE runpod_id = ?").bind(runpodId).first();
+  return (res as any) || null;
 }
