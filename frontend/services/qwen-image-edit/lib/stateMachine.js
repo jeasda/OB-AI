@@ -1,11 +1,11 @@
 ﻿export const States = {
   idle: 'idle',
-  ready: 'ready',
+  imageUploaded: 'image_uploaded',
+  readyToGenerate: 'ready_to_generate',
   paymentRequired: 'payment_required',
-  submitting: 'submitting',
-  processing: 'processing',
+  generating: 'generating',
   completed: 'completed',
-  failed: 'failed',
+  error: 'error',
   downloading: 'downloading'
 }
 
@@ -29,13 +29,13 @@ export const Events = {
 
 const stateRank = {
   [States.idle]: 0,
-  [States.ready]: 1,
+  [States.imageUploaded]: 1,
+  [States.readyToGenerate]: 2,
   [States.paymentRequired]: 2,
-  [States.submitting]: 3,
-  [States.processing]: 4,
+  [States.generating]: 3,
   [States.completed]: 5,
   [States.downloading]: 6,
-  [States.failed]: 5
+  [States.error]: 5
 }
 
 const resetEvents = new Set([Events.removeImage, Events.generateAgain, Events.cancelPay])
@@ -57,13 +57,13 @@ export function createInitialContext(defaults) {
 
 function guardRegression(currentState, nextState, eventType) {
   if (resetEvents.has(eventType)) return false
-  if (currentState === States.completed || currentState === States.failed) {
+  if (currentState === States.completed || currentState === States.error) {
     return nextState !== currentState
   }
   return stateRank[nextState] < stateRank[currentState]
 }
 
-export function transition(state, context, event, defaults) {
+export function transition(state, context, event) {
   const nextContext = { ...context, lastEventAt: Date.now() }
   let nextState = state
 
@@ -73,7 +73,7 @@ export function transition(state, context, event, defaults) {
       nextContext.error = null
       nextContext.errorType = null
       nextContext.resultUrl = null
-      nextState = States.ready
+      nextState = States.imageUploaded
       break
     }
     case Events.removeImage: {
@@ -87,7 +87,7 @@ export function transition(state, context, event, defaults) {
     }
     case Events.setOption: {
       nextContext.options = { ...nextContext.options, [event.key]: event.value }
-      nextState = nextContext.imageFile ? States.ready : States.idle
+      nextState = nextContext.imageFile ? States.readyToGenerate : States.idle
       break
     }
     case Events.openPayment: {
@@ -103,22 +103,22 @@ export function transition(state, context, event, defaults) {
     case Events.cancelPay: {
       nextContext.paymentConfirmed = false
       nextContext.payMethod = null
-      nextState = nextContext.imageFile ? States.ready : States.idle
+      nextState = nextContext.imageFile ? States.readyToGenerate : States.idle
       break
     }
     case Events.submit: {
       if (!nextContext.imageFile) {
         nextContext.error = 'missing_image'
         nextContext.errorType = 'validation'
-        nextState = States.failed
+        nextState = States.error
       } else {
-        nextState = States.submitting
+        nextState = States.generating
       }
       break
     }
     case Events.jobAccepted: {
       nextContext.jobId = event.jobId
-      nextState = States.processing
+      nextState = States.generating
       break
     }
     case Events.jobCompleted: {
@@ -131,14 +131,14 @@ export function transition(state, context, event, defaults) {
     case Events.jobFailed: {
       nextContext.error = event.error || 'job_failed'
       nextContext.errorType = event.errorType || 'api'
-      nextState = States.failed
+      nextState = States.error
       break
     }
     case Events.retry: {
       if (!nextContext.imageFile) {
         nextState = States.idle
       } else {
-        nextState = States.submitting
+        nextState = States.generating
       }
       break
     }
@@ -147,7 +147,7 @@ export function transition(state, context, event, defaults) {
       nextContext.jobId = null
       nextContext.error = null
       nextContext.errorType = null
-      nextState = nextContext.imageFile ? States.ready : States.idle
+      nextState = nextContext.imageFile ? States.readyToGenerate : States.idle
       break
     }
     case Events.downloadStart: {
@@ -163,7 +163,7 @@ export function transition(state, context, event, defaults) {
     case Events.timeout: {
       nextContext.error = 'timeout'
       nextContext.errorType = 'timeout'
-      nextState = States.failed
+      nextState = States.error
       break
     }
     default:
@@ -179,16 +179,16 @@ export function transition(state, context, event, defaults) {
 
 export function deriveFlags(state, context) {
   const hasImage = !!context.imageFile
-  const isBusy = state === States.submitting || state === States.processing || state === States.downloading
+  const isBusy = state === States.generating || state === States.downloading
   const canSubmit = hasImage && !isBusy && state !== States.paymentRequired
 
   return {
     hasImage,
     isBusy,
     canSubmit,
-    showProgress: state === States.processing || state === States.submitting,
+    showProgress: state === States.generating,
     showResult: state === States.completed || state === States.downloading,
-    showError: state === States.failed,
+    showError: state === States.error,
     showPayment: state === States.paymentRequired,
     canDownload: state === States.completed || state === States.downloading
   }

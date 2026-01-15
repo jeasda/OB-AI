@@ -5,113 +5,103 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Qwen Image Edit | OB AI Studio</title>
   <link rel="icon" type="image/png" href="/logo.png">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    .bg-grid {
-      background-image: radial-gradient(rgba(148, 163, 184, 0.12) 1px, transparent 1px);
-      background-size: 24px 24px;
-    }
-    @keyframes shimmer {
-      0% { background-position: 0% 50%; }
-      100% { background-position: 100% 50%; }
-    }
-  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css">
 </head>
-<body class="min-h-screen bg-slate-950 text-slate-100">
-  <div class="min-h-screen bg-grid">
-    <header class="flex items-center justify-between px-4 py-4 md:px-8">
-      <div class="flex items-center gap-3">
-        <img src="/logo.png" alt="OB AI Studio" class="h-9 w-9 rounded-full border border-slate-700">
+<body>
+  <div class="page">
+    <header class="header">
+      <div class="brand">
+        <img src="/logo.png" alt="OB AI Studio" class="brand-logo">
         <div>
-          <div class="text-lg font-semibold">OB AI Studio</div>
-          <div class="text-xs text-slate-400">Qwen Image Edit</div>
+          <div class="brand-title">OB AI Studio</div>
+          <div class="brand-subtitle">Qwen Image Edit</div>
         </div>
       </div>
-      <div class="flex items-center gap-2">
-        <button class="h-9 w-9 rounded-full border border-slate-800 text-slate-300 hover:border-slate-600">?</button>
-        <button class="h-9 w-9 rounded-full border border-slate-800 text-slate-300 hover:border-slate-600">%</button>
-        <div id="credit-pill" class="hidden md:flex items-center gap-2 rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300"></div>
+      <div class="header-actions">
+        <div id="state-pill" class="pill"></div>
+        <div id="credit-pill" class="pill"></div>
+        <button class="icon-btn">เข้าสู่ระบบ</button>
       </div>
     </header>
 
-    <main class="px-4 pb-10 md:px-8">
-      <div class="grid gap-6 lg:grid-cols-[320px_1fr_220px]">
-        <aside class="space-y-5 rounded-2xl border border-slate-800 bg-slate-900/70 p-4 shadow-xl">
-          <div>
-            <h2 class="text-base font-semibold">อัปโหลดภาพ</h2>
-            <p class="text-xs text-slate-400">รองรับ JPG/PNG ขนาดไม่เกิน 10MB</p>
+    <main class="layout">
+      <aside class="panel panel-section">
+        <div>
+          <div class="panel-title">Control</div>
+          <h2>อัปโหลดภาพ</h2>
+          <p class="muted">รองรับ JPG/PNG ขนาดไม่เกิน 10MB</p>
+        </div>
+
+        <div id="upload-zone" class="upload-zone">
+          <div>ลากภาพมาวาง หรือกดเพื่อเลือกไฟล์</div>
+          <div class="muted">ระบบจะปรับภาพด้วย Qwen</div>
+          <input id="file-input" type="file" accept="image/png,image/jpeg" hidden>
+          <img id="preview-thumb" alt="preview" class="upload-thumb hidden">
+        </div>
+
+        <div class="panel-section">
+          <div class="panel-title">Options</div>
+          <div id="options-slot" class="panel-section"></div>
+        </div>
+
+        <div id="ratio-slot" class="panel-section"></div>
+
+        <details id="prompt-preview" class="panel">
+          <summary>Prompt ที่จะใช้</summary>
+          <div class="muted" style="margin-top: 8px;">
+            <div id="prompt-preview-text"></div>
+            <div id="prompt-preview-tags" style="margin-top: 8px;"></div>
           </div>
+        </details>
 
-          <div id="upload-zone" class="relative flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-slate-700 bg-slate-900/60 p-6 text-center transition hover:border-slate-500">
-            <div class="text-sm text-slate-300">ลากภาพมาวาง หรือกดเพื่อเลือกไฟล์</div>
-            <div class="text-xs text-slate-500">ระบบจะปรับภาพด้วย Qwen</div>
-            <input id="file-input" type="file" accept="image/png,image/jpeg" class="hidden">
-            <img id="preview-thumb" alt="preview" class="hidden max-h-40 rounded-xl border border-slate-700 object-contain">
-          </div>
+        <div class="panel-section">
+          <button id="submit-btn" class="btn btn-primary">เริ่มแก้ไขภาพ</button>
+          <div id="inline-error" class="muted" style="color:#b91c1c;"></div>
+          <div class="muted">โหมดทดสอบ: ระบบชำระเงินจำลองและยังไม่ตัดเงินจริง</div>
+        </div>
+      </aside>
 
-          <div class="space-y-4">
-            <div class="text-sm font-semibold">เลือกตัวเลือก (Prompt Builder)</div>
-            <div id="options-slot" class="space-y-3"></div>
-          </div>
-
-          <div id="ratio-slot" class="space-y-3"></div>
-
-          <details id="prompt-preview" class="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
-            <summary class="cursor-pointer text-xs font-semibold text-slate-200">Prompt ที่จะใช้</summary>
-            <div class="mt-2 text-xs text-slate-300">
-              <div id="prompt-preview-text"></div>
-              <div id="prompt-preview-tags" class="mt-2 text-slate-500"></div>
+      <section class="panel-section">
+        <div id="marketing-panel" class="preview-card">
+          <div class="panel-title">Qwen Image Edit</div>
+          <h1>แก้ไขภาพให้เป็นสไตล์ใหม่แบบสมจริง</h1>
+          <p class="muted">เลือกชุด โลเคชัน อารมณ์ และท่าทาง แล้วให้ Qwen จัดการให้จบในไม่กี่ขั้นตอน</p>
+          <div class="panel-section" style="gap: 12px;">
+            <div class="panel">
+              <strong>1. อัปโหลดภาพ</strong>
+              <div class="muted">ภาพหน้าชัด แสงดี จะได้ผลลัพธ์สวยขึ้น</div>
             </div>
-          </details>
-
-          <div class="space-y-2">
-            <button id="submit-btn" class="w-full rounded-xl bg-emerald-400 py-2 text-sm font-semibold text-slate-950 shadow hover:bg-emerald-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300">
-              เริ่มแก้ไขภาพ
-            </button>
-            <div id="inline-error" class="text-xs text-rose-300"></div>
-            <div class="text-[11px] text-slate-500">โหมดทดสอบ: ระบบชำระเงินจำลองและยังไม่ตัดเงินจริง</div>
-          </div>
-        </aside>
-
-        <section class="space-y-6">
-          <div id="marketing-panel" class="space-y-4 rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900/70 to-slate-950 p-6">
-            <div class="text-sm uppercase tracking-[0.2em] text-emerald-300">Qwen Image Edit</div>
-            <h1 class="text-2xl font-semibold">แก้ไขภาพให้เป็นสไตล์ใหม่แบบสมจริง</h1>
-            <p class="text-sm text-slate-400">เลือกชุด โลเคชัน อารมณ์ และท่าทาง แล้วให้ Qwen จัดการให้จบในไม่กี่ขั้นตอน</p>
-            <div class="grid gap-3 md:grid-cols-3">
-              <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-xs text-slate-300">
-                <div class="font-semibold">1. อัปโหลดภาพ</div>
-                <div class="text-slate-500">ภาพหน้าชัด แสงดี จะได้ผลลัพธ์สวยขึ้น</div>
-              </div>
-              <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-xs text-slate-300">
-                <div class="font-semibold">2. เลือกตัวเลือก</div>
-                <div class="text-slate-500">กำหนดชุด ฉาก และอารมณ์ที่ต้องการ</div>
-              </div>
-              <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-xs text-slate-300">
-                <div class="font-semibold">3. เริ่มแก้ไข</div>
-                <div class="text-slate-500">รอไม่กี่นาที ระบบจะเตรียมภาพให้</div>
-              </div>
+            <div class="panel">
+              <strong>2. เลือกตัวเลือก</strong>
+              <div class="muted">กำหนดชุด ฉาก และอารมณ์ที่ต้องการ</div>
+            </div>
+            <div class="panel">
+              <strong>3. เริ่มแก้ไข</strong>
+              <div class="muted">รอไม่กี่นาที ระบบจะเตรียมภาพให้</div>
             </div>
           </div>
+        </div>
 
-          <div id="before-after" class="hidden rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
-            <div class="text-xs uppercase tracking-[0.2em] text-slate-400">ภาพต้นฉบับ</div>
-            <img id="before-image" alt="before" class="mt-3 w-full rounded-xl border border-slate-800 object-contain">
-          </div>
+        <div id="before-after" class="panel hidden">
+          <div class="panel-title">ภาพต้นฉบับ</div>
+          <img id="before-image" alt="before" class="upload-thumb">
+        </div>
 
-          <div id="progress-slot"></div>
-          <div id="result-slot"></div>
+        <div id="progress-slot"></div>
+        <div id="result-slot"></div>
 
-          <div id="error-panel" class="hidden rounded-2xl border border-rose-500/30 bg-rose-500/10 p-5 text-sm text-rose-200"></div>
-        </section>
+        <div id="error-panel" class="error-box hidden"></div>
+      </section>
 
-        <aside class="hidden flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900/70 p-4 text-sm lg:flex">
-          <div class="text-xs uppercase tracking-[0.2em] text-slate-400">Actions</div>
-          <button id="download-btn" class="rounded-xl border border-slate-700 py-2 text-slate-200 hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-40">ดาวน์โหลด (มีลายน้ำ)</button>
-          <button id="generate-new-btn" class="rounded-xl border border-slate-700 py-2 text-slate-200 hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-40">เจนใหม่</button>
-          <div id="credit-rail" class="mt-4 text-xs text-slate-400"></div>
-        </aside>
-      </div>
+      <aside class="panel panel-section">
+        <div class="panel-title">Result</div>
+        <button id="download-btn" class="btn btn-secondary">ดาวน์โหลด (มีลายน้ำ)</button>
+        <button id="generate-new-btn" class="btn btn-secondary">เจนใหม่</button>
+        <div id="credit-rail" class="muted"></div>
+      </aside>
     </main>
   </div>
 

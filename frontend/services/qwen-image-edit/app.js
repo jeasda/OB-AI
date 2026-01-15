@@ -43,6 +43,7 @@ const elements = {
   errorPanel: document.getElementById('error-panel'),
   downloadBtn: document.getElementById('download-btn'),
   generateNewBtn: document.getElementById('generate-new-btn'),
+  statePill: document.getElementById('state-pill'),
   creditPill: document.getElementById('credit-pill'),
   creditRail: document.getElementById('credit-rail'),
   promptPreviewText: document.getElementById('prompt-preview-text'),
@@ -190,14 +191,14 @@ document.getElementById('payment-modal-root').appendChild(paymentModal.el)
 elements.uploadZone.addEventListener('click', () => elements.fileInput.click())
 elements.uploadZone.addEventListener('dragover', (event) => {
   event.preventDefault()
-  elements.uploadZone.classList.add('border-emerald-400')
+  elements.uploadZone.classList.add('is-dragging')
 })
 elements.uploadZone.addEventListener('dragleave', () => {
-  elements.uploadZone.classList.remove('border-emerald-400')
+  elements.uploadZone.classList.remove('is-dragging')
 })
 elements.uploadZone.addEventListener('drop', (event) => {
   event.preventDefault()
-  elements.uploadZone.classList.remove('border-emerald-400')
+  elements.uploadZone.classList.remove('is-dragging')
   const file = event.dataTransfer.files[0]
   if (file) handleFile(file)
 })
@@ -261,7 +262,7 @@ function replaceOptions(control, options) {
 function dispatch(event) {
   const prevState = machine.state
   const prevContext = machine.context
-  machine = transition(machine.state, machine.context, event, defaultOptions)
+  machine = transition(machine.state, machine.context, event)
   render()
   handleStateChange(prevState, prevContext, machine.state, machine.context, event)
 }
@@ -450,6 +451,7 @@ function render() {
 
   updateActionButtons(flags.showResult)
   setControlsDisabled(flags.isBusy || flags.showPayment)
+  updateStatePill(machine.state)
 
   if (flags.showError) {
     showError(machine.context.error || 'เกิดข้อผิดพลาด')
@@ -459,17 +461,17 @@ function render() {
 }
 
 function handleStateChange(prevState, prevContext, nextState, nextContext) {
-  if (nextState === States.submitting && prevState !== States.submitting) {
+  if (nextState === States.generating && prevState !== States.generating) {
     startProgressLoop()
     progressPanel.show()
     submitJob()
   }
 
-  if (nextState === States.processing && prevState !== States.processing) {
+  if (nextState === States.generating && prevState !== States.generating) {
     startPolling()
   }
 
-  if (prevState === States.processing && nextState !== States.processing) {
+  if (prevState === States.generating && nextState !== States.generating) {
     stopPolling()
   }
 
@@ -485,7 +487,7 @@ function handleStateChange(prevState, prevContext, nextState, nextContext) {
     saveHistory(nextContext.resultUrl)
   }
 
-  if (nextState === States.failed) {
+  if (nextState === States.error) {
     stopPolling()
     stopProgressLoop()
   }
@@ -498,7 +500,7 @@ function updateActionButtons(enabled) {
 
 function setControlsDisabled(disabled) {
   elements.fileInput.disabled = disabled
-  elements.uploadZone.classList.toggle('opacity-60', disabled)
+  elements.uploadZone.classList.toggle('is-disabled', disabled)
   elements.submitBtn.disabled = disabled || !machine.context.imageFile
 
   const selects = elements.optionsSlot.querySelectorAll('select')
@@ -509,7 +511,6 @@ function setControlsDisabled(disabled) {
   const ratioButtons = elements.ratioSlot.querySelectorAll('button')
   ratioButtons.forEach((btn) => {
     btn.disabled = disabled
-    btn.classList.toggle('opacity-60', disabled)
   })
 }
 
@@ -528,6 +529,20 @@ function updatePromptPreview() {
   const result = buildPromptV1(machine.context.options, 'th')
   elements.promptPreviewText.textContent = result.prompt
   elements.promptPreviewTags.textContent = result.tags.length ? `แท็ก: ${result.tags.join(', ')}` : ''
+}
+
+function updateStatePill(state) {
+  const labels = {
+    [States.idle]: 'พร้อมเริ่ม',
+    [States.imageUploaded]: 'อัปโหลดแล้ว',
+    [States.readyToGenerate]: 'พร้อมสร้างภาพ',
+    [States.paymentRequired]: 'รอชำระเงิน',
+    [States.generating]: 'กำลังประมวลผล',
+    [States.completed]: 'เสร็จแล้ว',
+    [States.error]: 'เกิดข้อผิดพลาด',
+    [States.downloading]: 'กำลังดาวน์โหลด'
+  }
+  elements.statePill.textContent = labels[state] || 'สถานะไม่ทราบ'
 }
 
 function persistOptions() {
