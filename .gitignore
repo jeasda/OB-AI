@@ -20,6 +20,8 @@
 # production
 /build
 /dist
+/frontend/services/qwen-image-edit/dist
+/frontend/services/qwen-image-edit/node_modules
 
 # misc
 .DS_Store

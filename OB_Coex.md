@@ -240,3 +240,29 @@
 ### Notes for Next Session
 - Verify Pages build uses npm run buildfrontend and serves dist
 - Perform UI smoke test on /services/qwen-image-edit
+2026-01-16 0316 Frontend Pages Build Deploy Fix
+
+Objective
+- Ensure Vite frontend is built and served correctly by Cloudflare Pages
+
+Actions Performed
+- Build verification
+- Config fixes
+- Docs added
+
+Commands Executed
+- npm install
+- npm run build
+
+Validation
+- dist/ exists
+- dist/index.html exists
+- dist/assets hashed files exist
+- Pages UI redeploy still required
+
+Runtime Status
+- Local build OK
+- Pages deploy Pending
+
+Notes for Next Session
+- Redeploy Cloudflare Pages with root frontend/services/qwen-image-edit and build command npm install && npm run build
