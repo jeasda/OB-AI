@@ -267,3 +267,23 @@ User/Client
 
 ### Remaining risks
 - Unstaged and uncommitted changes remain in the repo and should be reviewed separately
+## 2026-01-16 01:25 Session Summary
+### Objective
+- Phase 3 kickoff: ship Qwen Image Edit service page with state machine and prompt engine v1
+### Actions Performed
+- Updated Qwen Image Edit frontend UI, state machine, and prompt engine v1 mappings
+- Added prompt-only test suite and reports output
+- Added frontend state machine, prompt mapping, and API contract docs
+- Appended Phase 3 prompt/UI entry to workflow changelog
+### Commands Executed
+- npm run typecheck
+- Get-Date -Format 'yyyy-MM-dd HH:mm'
+### Validation
+- TypeScript typecheck passed
+### Runtime Status
+- Local
+- Mock mode OFF
+- Worker not running
+### Notes for Next Session
+- Run `node scripts/prompt-tests/run.mjs` to validate prompt engine outputs
+- Review remaining unrelated untracked changes before push

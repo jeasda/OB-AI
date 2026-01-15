@@ -1,0 +1,26 @@
+﻿# Qwen Image Edit Frontend State Machine
+
+```mermaid
+stateDiagram-v2
+  [*] --> IDLE
+  IDLE --> READY: UPLOAD_IMAGE
+  READY --> PAYMENT_REQUIRED: OPEN_PAYMENT
+  PAYMENT_REQUIRED --> READY: CANCEL_PAY
+  PAYMENT_REQUIRED --> SUBMITTING: SUBMIT
+  READY --> SUBMITTING: SUBMIT
+  SUBMITTING --> PROCESSING: JOB_ACCEPTED
+  PROCESSING --> COMPLETED: JOB_COMPLETED
+  PROCESSING --> FAILED: JOB_FAILED
+  PROCESSING --> FAILED: TIMEOUT
+  FAILED --> SUBMITTING: RETRY
+  COMPLETED --> DOWNLOADING: DOWNLOAD_START
+  DOWNLOADING --> COMPLETED: DOWNLOAD_DONE
+  READY --> IDLE: REMOVE_IMAGE
+  FAILED --> IDLE: REMOVE_IMAGE
+  COMPLETED --> READY: GENERATE_AGAIN
+```
+
+## Notes
+- One-way transitions are enforced; status regression is ignored unless a reset event is used.
+- RESET events: REMOVE_IMAGE, GENERATE_AGAIN, CANCEL_PAY.
+- DOWNLOADING is a UI-only state to prevent duplicate downloads while the file is prepared.

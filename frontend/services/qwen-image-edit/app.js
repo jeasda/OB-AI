@@ -1,0 +1,652 @@
+﻿import { createOptionSelect } from './components/OptionSelect.js'
+import { createRatioSelect } from './components/RatioSelect.js'
+import { createPaymentModal } from './components/PaymentModal.js'
+import { createProgressPanel } from './components/ProgressPanel.js'
+import { createResultPanel } from './components/ResultPanel.js'
+import { buildPromptV1, catalogs } from './lib/promptEngineV1.js'
+import { getCredits, addCredits, spendCredits } from './lib/creditsStore.js'
+import { States, Events, transition, deriveFlags, createInitialContext } from './lib/stateMachine.js'
+
+const STORAGE_KEYS = {
+  options: 'obai_qwen_image_edit_options',
+  history: 'obai_qwen_image_edit_history'
+}
+
+const COST_PER_IMAGE = 1
+const POLL_INTERVAL_MS = 4000
+const TIMEOUT_MS = 12 * 60 * 1000
+
+const defaultOptions = {
+  clothes: 'ไม่เปลี่ยน',
+  location: 'ไม่เปลี่ยน',
+  locationSub: '',
+  activity: 'ไม่ระบุ',
+  activitySub: '',
+  mood: 'ถ่ายแบบ',
+  ratio: 'square',
+  ratioDisplay: 'Square'
+}
+
+const elements = {
+  uploadZone: document.getElementById('upload-zone'),
+  fileInput: document.getElementById('file-input'),
+  previewThumb: document.getElementById('preview-thumb'),
+  beforePanel: document.getElementById('before-after'),
+  beforeImage: document.getElementById('before-image'),
+  optionsSlot: document.getElementById('options-slot'),
+  ratioSlot: document.getElementById('ratio-slot'),
+  submitBtn: document.getElementById('submit-btn'),
+  inlineError: document.getElementById('inline-error'),
+  marketingPanel: document.getElementById('marketing-panel'),
+  progressSlot: document.getElementById('progress-slot'),
+  resultSlot: document.getElementById('result-slot'),
+  errorPanel: document.getElementById('error-panel'),
+  downloadBtn: document.getElementById('download-btn'),
+  generateNewBtn: document.getElementById('generate-new-btn'),
+  creditPill: document.getElementById('credit-pill'),
+  creditRail: document.getElementById('credit-rail'),
+  promptPreviewText: document.getElementById('prompt-preview-text'),
+  promptPreviewTags: document.getElementById('prompt-preview-tags')
+}
+
+let machine = {
+  state: States.idle,
+  context: createInitialContext(defaultOptions)
+}
+
+let pollTimer = null
+let pollController = null
+let progressTimer = null
+let progressValue = 0
+let currentResultUrl = ''
+let pendingSubmit = false
+let jobStartAt = 0
+
+const savedOptions = loadOptions()
+machine.context.options = { ...defaultOptions, ...savedOptions }
+
+const optionControls = {}
+
+const clothesControl = createOptionSelect({
+  id: 'opt-clothes',
+  label: 'เปลี่ยนชุดเสื้อผ้า',
+  options: catalogs.clothes.map((item) => ({ value: item.label, label: item.label })),
+  value: machine.context.options.clothes,
+  onChange: (value) => updateOption('clothes', value)
+})
+optionControls.clothes = clothesControl
+
+elements.optionsSlot.appendChild(clothesControl.el)
+
+const locationControl = createOptionSelect({
+  id: 'opt-location',
+  label: 'เปลี่ยนสถานที่',
+  options: catalogs.location.map((item) => ({ value: item.label, label: item.label })),
+  value: machine.context.options.location,
+  onChange: (value) => updateOption('location', value)
+})
+optionControls.location = locationControl
+
+elements.optionsSlot.appendChild(locationControl.el)
+
+const locationSubControl = createOptionSelect({
+  id: 'opt-location-sub',
+  label: 'สถานที่/เมือง',
+  options: [{ value: '', label: 'ไม่ระบุ' }],
+  value: machine.context.options.locationSub,
+  onChange: (value) => updateOption('locationSub', value)
+})
+optionControls.locationSub = locationSubControl
+
+elements.optionsSlot.appendChild(locationSubControl.el)
+
+const activityControl = createOptionSelect({
+  id: 'opt-activity',
+  label: 'กำลังทำอะไร',
+  options: catalogs.activity.map((item) => ({ value: item.label, label: item.label })),
+  value: machine.context.options.activity,
+  onChange: (value) => updateOption('activity', value)
+})
+optionControls.activity = activityControl
+
+elements.optionsSlot.appendChild(activityControl.el)
+
+const activitySubControl = createOptionSelect({
+  id: 'opt-activity-sub',
+  label: 'รายละเอียดกิจกรรม',
+  options: [{ value: '', label: 'ไม่ระบุ' }],
+  value: machine.context.options.activitySub,
+  onChange: (value) => updateOption('activitySub', value)
+})
+optionControls.activitySub = activitySubControl
+
+elements.optionsSlot.appendChild(activitySubControl.el)
+
+const moodControl = createOptionSelect({
+  id: 'opt-mood',
+  label: 'อารมณ์ไหน',
+  options: catalogs.mood.map((item) => ({ value: item.label, label: item.label })),
+  value: machine.context.options.mood,
+  onChange: (value) => updateOption('mood', value)
+})
+optionControls.mood = moodControl
+
+elements.optionsSlot.appendChild(moodControl.el)
+
+const ratioControl = createRatioSelect({
+  value: machine.context.options.ratio,
+  onChange: (value) => {
+    const ratioLabel = catalogs.ratio.find((ratio) => ratio.id === value)?.label || 'Square'
+    updateOption('ratio', value)
+    updateOption('ratioDisplay', ratioLabel)
+    ratioControl.setValue(value)
+  }
+})
+
+elements.ratioSlot.appendChild(ratioControl.el)
+
+updateSubSelects()
+updatePromptPreview()
+render()
+
+const progressPanel = createProgressPanel()
+elements.progressSlot.appendChild(progressPanel.el)
+
+const resultPanel = createResultPanel({
+  onDownload: downloadResult,
+  onGenerateNew: handleGenerateAgain
+})
+elements.resultSlot.appendChild(resultPanel.el)
+
+const paymentModal = createPaymentModal({
+  onClose: () => {
+    paymentModal.close()
+    dispatch({ type: Events.cancelPay })
+  },
+  onPurchasePackage: (credits) => {
+    addCredits(credits)
+    updateCreditsUI()
+    paymentModal.close()
+    if (pendingSubmit) {
+      pendingSubmit = false
+      handleSubmit()
+    }
+  },
+  onPaySingle: () => {
+    addCredits(COST_PER_IMAGE)
+    updateCreditsUI()
+    paymentModal.close()
+    if (pendingSubmit) {
+      pendingSubmit = false
+      handleSubmit()
+    }
+  }
+})
+
+document.getElementById('payment-modal-root').appendChild(paymentModal.el)
+
+// Upload handlers
+
+elements.uploadZone.addEventListener('click', () => elements.fileInput.click())
+elements.uploadZone.addEventListener('dragover', (event) => {
+  event.preventDefault()
+  elements.uploadZone.classList.add('border-emerald-400')
+})
+elements.uploadZone.addEventListener('dragleave', () => {
+  elements.uploadZone.classList.remove('border-emerald-400')
+})
+elements.uploadZone.addEventListener('drop', (event) => {
+  event.preventDefault()
+  elements.uploadZone.classList.remove('border-emerald-400')
+  const file = event.dataTransfer.files[0]
+  if (file) handleFile(file)
+})
+
+elements.fileInput.addEventListener('change', (event) => {
+  const file = event.target.files[0]
+  if (file) handleFile(file)
+})
+
+// Actions
+
+elements.submitBtn.addEventListener('click', handleSubmit)
+
+elements.generateNewBtn.addEventListener('click', handleGenerateAgain)
+
+elements.downloadBtn.addEventListener('click', downloadResult)
+
+function updateOption(key, value) {
+  dispatch({ type: Events.setOption, key, value })
+  if (key === 'location') {
+    updateOption('locationSub', '')
+  }
+  if (key === 'activity') {
+    updateOption('activitySub', '')
+  }
+  updateSubSelects()
+  persistOptions()
+  updatePromptPreview()
+}
+
+function updateSubSelects() {
+  const location = machine.context.options.location
+  const locationEntry = catalogs.location.find((item) => item.label === location)
+  const subLocations = locationEntry?.sub || []
+  locationSubControl.el.classList.toggle('hidden', subLocations.length === 0)
+  replaceOptions(locationSubControl, subLocations)
+
+  const activity = machine.context.options.activity
+  const activityEntry = catalogs.activity.find((item) => item.label === activity)
+  const subActivities = activityEntry?.sub || []
+  activitySubControl.el.classList.toggle('hidden', subActivities.length === 0)
+  replaceOptions(activitySubControl, subActivities)
+}
+
+function replaceOptions(control, options) {
+  const select = control.el.querySelector('select')
+  select.innerHTML = ''
+  const defaultOpt = document.createElement('option')
+  defaultOpt.value = ''
+  defaultOpt.textContent = 'ไม่ระบุ'
+  select.appendChild(defaultOpt)
+  for (const option of options) {
+    const opt = document.createElement('option')
+    opt.value = option
+    opt.textContent = option
+    select.appendChild(opt)
+  }
+  select.value = machine.context.options[select.id === 'opt-location-sub' ? 'locationSub' : 'activitySub'] || ''
+}
+
+function dispatch(event) {
+  const prevState = machine.state
+  const prevContext = machine.context
+  machine = transition(machine.state, machine.context, event, defaultOptions)
+  render()
+  handleStateChange(prevState, prevContext, machine.state, machine.context, event)
+}
+
+function handleFile(file) {
+  if (!file.type.startsWith('image/')) {
+    showInlineError('กรุณาอัปโหลดไฟล์ภาพเท่านั้น')
+    return
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    showInlineError('ไฟล์ต้องมีขนาดไม่เกิน 10MB')
+    return
+  }
+
+  machine.context.options = { ...machine.context.options }
+  dispatch({ type: Events.uploadImage, file })
+
+  elements.previewThumb.src = URL.createObjectURL(file)
+  elements.previewThumb.classList.remove('hidden')
+  elements.beforeImage.src = elements.previewThumb.src
+  elements.beforePanel.classList.remove('hidden')
+  showInlineError('')
+}
+
+function handleSubmit() {
+  showInlineError('')
+  elements.errorPanel.classList.add('hidden')
+
+  if (!machine.context.imageFile) {
+    showInlineError('กรุณาอัปโหลดภาพก่อนเริ่มแก้ไข')
+    return
+  }
+
+  const credits = getCredits()
+  if (credits < COST_PER_IMAGE) {
+    pendingSubmit = true
+    dispatch({ type: Events.openPayment })
+    paymentModal.open(COST_PER_IMAGE)
+    return
+  }
+
+  if (!spendCredits(COST_PER_IMAGE)) {
+    showInlineError('เครดิตไม่เพียงพอ')
+    return
+  }
+
+  updateCreditsUI()
+  dispatch({ type: Events.submit })
+}
+
+async function submitJob() {
+  progressValue = 0
+  progressPanel.setProgress(0)
+  progressPanel.setTitle('เตรียมภาพ')
+  progressPanel.setNote('กำลังเตรียมข้อมูลและส่งงาน')
+  progressPanel.setStep(0)
+
+  const promptPayload = buildPromptV1(machine.context.options, 'th')
+  const formData = new FormData()
+  formData.append('prompt', promptPayload.prompt)
+  formData.append('ratio', machine.context.options.ratio)
+  formData.append('model', 'qwen-image')
+  formData.append('service', 'qwen-image-edit')
+  formData.append('image', machine.context.imageFile)
+  formData.append('options', JSON.stringify(machine.context.options))
+
+  try {
+    const res = await fetch('/api/queue/create', {
+      method: 'POST',
+      body: formData
+    })
+
+    const data = await res.json()
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || 'เริ่มงานไม่สำเร็จ')
+    }
+
+    const jobId = data.job_id || data.jobId || data.job?.id
+    if (!jobId) throw new Error('ไม่พบรหัสงาน')
+
+    jobStartAt = Date.now()
+    dispatch({ type: Events.jobAccepted, jobId })
+  } catch (error) {
+    dispatch({ type: Events.jobFailed, error: error.message || 'เชื่อมต่อไม่สำเร็จ' })
+  }
+}
+
+function startPolling() {
+  stopPolling()
+  pollController = new AbortController()
+  pollTimer = setInterval(checkStatus, POLL_INTERVAL_MS)
+  checkStatus()
+}
+
+function stopPolling() {
+  if (pollTimer) clearInterval(pollTimer)
+  pollTimer = null
+  if (pollController) {
+    pollController.abort()
+    pollController = null
+  }
+}
+
+async function checkStatus() {
+  if (!machine.context.jobId) return
+  if (Date.now() - jobStartAt > TIMEOUT_MS) {
+    dispatch({ type: Events.timeout })
+    return
+  }
+
+  try {
+    const res = await fetch(`/api/queue/status/${machine.context.jobId}`, {
+      signal: pollController?.signal
+    })
+    const data = await res.json()
+
+    if (!res.ok || !data.ok) {
+      if (data?.job?.status === 'failed') {
+        throw new Error(data?.job?.error || data?.error || 'งานล้มเหลว')
+      }
+      return
+    }
+
+    const status = data?.job?.status
+    if (status === 'completed') {
+      const resultUrl = data.result_url || (data.job?.result_key ? `/api/result/${encodeURIComponent(data.job.result_key)}` : '')
+      if (!resultUrl) throw new Error('ไม่พบผลลัพธ์')
+      dispatch({ type: Events.jobCompleted, resultUrl })
+    } else if (status === 'failed') {
+      throw new Error(data?.job?.error || 'งานล้มเหลว')
+    } else {
+      progressPanel.setNote('ยังทำงานอยู่ โปรดรอสักครู่')
+    }
+  } catch (error) {
+    dispatch({ type: Events.jobFailed, error: error.message || 'เชื่อมต่อไม่สำเร็จ' })
+  }
+}
+
+function startProgressLoop() {
+  if (progressTimer) clearInterval(progressTimer)
+  progressTimer = setInterval(() => {
+    if (progressValue >= 98) return
+    progressValue += progressValue < 40 ? 2 : progressValue < 75 ? 1 : 0.3
+    progressPanel.setProgress(progressValue)
+
+    if (progressValue < 33) {
+      progressPanel.setTitle('เตรียมภาพ')
+      progressPanel.setStep(0)
+    } else if (progressValue < 70) {
+      progressPanel.setTitle('ประมวลผล')
+      progressPanel.setStep(1)
+    } else {
+      progressPanel.setTitle('เก็บรายละเอียด')
+      progressPanel.setStep(2)
+    }
+  }, 200)
+}
+
+function stopProgressLoop() {
+  if (progressTimer) clearInterval(progressTimer)
+  progressTimer = null
+}
+
+function handleGenerateAgain() {
+  currentResultUrl = ''
+  dispatch({ type: Events.generateAgain })
+}
+
+function showError(message) {
+  elements.errorPanel.textContent = message
+  elements.errorPanel.classList.remove('hidden')
+}
+
+function render() {
+  const flags = deriveFlags(machine.state, machine.context)
+
+  elements.submitBtn.disabled = !flags.canSubmit
+  elements.marketingPanel.classList.toggle('hidden', flags.showProgress || flags.showResult)
+
+  if (!flags.showProgress) {
+    progressPanel.hide()
+  }
+  if (!flags.showResult) {
+    resultPanel.hide()
+  }
+
+  updateActionButtons(flags.showResult)
+  setControlsDisabled(flags.isBusy || flags.showPayment)
+
+  if (flags.showError) {
+    showError(machine.context.error || 'เกิดข้อผิดพลาด')
+  } else {
+    elements.errorPanel.classList.add('hidden')
+  }
+}
+
+function handleStateChange(prevState, prevContext, nextState, nextContext) {
+  if (nextState === States.submitting && prevState !== States.submitting) {
+    startProgressLoop()
+    progressPanel.show()
+    submitJob()
+  }
+
+  if (nextState === States.processing && prevState !== States.processing) {
+    startPolling()
+  }
+
+  if (prevState === States.processing && nextState !== States.processing) {
+    stopPolling()
+  }
+
+  if (nextState === States.completed) {
+    stopProgressLoop()
+    progressPanel.setProgress(100)
+    progressPanel.setTitle('เสร็จแล้ว')
+    progressPanel.setStep(2)
+
+    currentResultUrl = nextContext.resultUrl
+    resultPanel.setImage(nextContext.resultUrl)
+    resultPanel.show()
+    saveHistory(nextContext.resultUrl)
+  }
+
+  if (nextState === States.failed) {
+    stopPolling()
+    stopProgressLoop()
+  }
+}
+
+function updateActionButtons(enabled) {
+  elements.downloadBtn.disabled = !enabled
+  elements.generateNewBtn.disabled = !enabled
+}
+
+function setControlsDisabled(disabled) {
+  elements.fileInput.disabled = disabled
+  elements.uploadZone.classList.toggle('opacity-60', disabled)
+  elements.submitBtn.disabled = disabled || !machine.context.imageFile
+
+  const selects = elements.optionsSlot.querySelectorAll('select')
+  selects.forEach((select) => {
+    select.disabled = disabled
+  })
+
+  const ratioButtons = elements.ratioSlot.querySelectorAll('button')
+  ratioButtons.forEach((btn) => {
+    btn.disabled = disabled
+    btn.classList.toggle('opacity-60', disabled)
+  })
+}
+
+function showInlineError(message) {
+  elements.inlineError.textContent = message
+}
+
+function updateCreditsUI() {
+  const credits = getCredits()
+  elements.creditPill.textContent = `เครดิตคงเหลือ ${credits}`
+  elements.creditPill.classList.remove('hidden')
+  elements.creditRail.textContent = `เครดิตคงเหลือ ${credits}`
+}
+
+function updatePromptPreview() {
+  const result = buildPromptV1(machine.context.options, 'th')
+  elements.promptPreviewText.textContent = result.prompt
+  elements.promptPreviewTags.textContent = result.tags.length ? `แท็ก: ${result.tags.join(', ')}` : ''
+}
+
+function persistOptions() {
+  localStorage.setItem(STORAGE_KEYS.options, JSON.stringify(machine.context.options))
+}
+
+function loadOptions() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.options)
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+function saveHistory(resultUrl) {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.history)
+    const history = raw ? JSON.parse(raw) : []
+    const entry = { url: resultUrl, createdAt: new Date().toISOString() }
+    const next = [entry, ...history].slice(0, 5)
+    localStorage.setItem(STORAGE_KEYS.history, JSON.stringify(next))
+  } catch {
+    return
+  }
+}
+
+async function downloadResult() {
+  if (!currentResultUrl) return
+  dispatch({ type: Events.downloadStart })
+  try {
+    let sourceBlob
+    if (currentResultUrl.startsWith('data:image')) {
+      sourceBlob = dataUrlToBlob(currentResultUrl)
+    } else {
+      const res = await fetch(currentResultUrl)
+      sourceBlob = await res.blob()
+    }
+
+    const watermarkedBlob = await addWatermark(sourceBlob)
+    triggerDownload(watermarkedBlob, 'qwen-image-edit-watermarked.png')
+  } catch {
+    showInlineError('ดาวน์โหลดไม่สำเร็จ กรุณาลองใหม่')
+  } finally {
+    dispatch({ type: Events.downloadDone })
+  }
+}
+
+function dataUrlToBlob(dataUrl) {
+  const [meta, base64] = dataUrl.split(',')
+  const mimeMatch = meta.match(/data:(.*?);base64/)
+  const mime = mimeMatch ? mimeMatch[1] : 'image/png'
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+  return new Blob([bytes], { type: mime })
+}
+
+function addWatermark(blob) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(blob)
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = img.naturalWidth
+      canvas.height = img.naturalHeight
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        URL.revokeObjectURL(url)
+        reject(new Error('canvas_context'))
+        return
+      }
+      ctx.drawImage(img, 0, 0)
+
+      const padding = Math.max(24, Math.floor(canvas.width * 0.03))
+      const fontSize = Math.max(18, Math.floor(canvas.width * 0.02))
+      ctx.font = `${fontSize}px sans-serif`
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.6)'
+      ctx.textBaseline = 'bottom'
+
+      const text = 'OB AI Studio'
+      const metrics = ctx.measureText(text)
+      const badgeWidth = metrics.width + padding * 1.5
+      const badgeHeight = fontSize + padding * 0.8
+      const x = canvas.width - badgeWidth - padding
+      const y = canvas.height - padding
+
+      ctx.fillRect(x, y - badgeHeight, badgeWidth, badgeHeight)
+      ctx.fillStyle = 'rgba(226, 232, 240, 0.9)'
+      ctx.fillText(text, x + padding * 0.6, y - padding * 0.3)
+
+      canvas.toBlob((result) => {
+        URL.revokeObjectURL(url)
+        if (!result) {
+          reject(new Error('watermark_failed'))
+          return
+        }
+        resolve(result)
+      }, 'image/png')
+    }
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('image_load_failed'))
+    }
+    img.src = url
+  })
+}
+
+function triggerDownload(blob, filename) {
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  URL.revokeObjectURL(url)
+}
+
+updateCreditsUI()

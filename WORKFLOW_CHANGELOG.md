@@ -22,3 +22,9 @@
 - Removed automated polling from live flow; added manual recovery poller.
 - Added timing breakdown metrics and workflow contract enforcement.
 - Added D1 disaster recovery drill documentation and helper script.
+
+## 2026-01-16
+### Phase 3 Qwen Image Edit UI + Prompt Engine
+- Updated Qwen Image Edit frontend state machine, UI layout, and prompt engine v1 mapping.
+- Added frontend API contract and prompt mapping documentation.
+- Added prompt-only golden tests for deterministic prompt generation.

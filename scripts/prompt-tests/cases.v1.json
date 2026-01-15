@@ -1,0 +1,198 @@
+﻿{
+  "version": "v1",
+  "cases": [
+    {
+      "id": "PT01_identity_base",
+      "name": "Base prompt always includes identity guardrails",
+      "selection": {
+        "clothes": "ไม่เปลี่ยน",
+        "location": "ไม่เปลี่ยน",
+        "locationSub": "",
+        "activity": "ไม่ระบุ",
+        "activitySub": "",
+        "mood": "ถ่ายแบบ",
+        "ratio": "square",
+        "ratioDisplay": "Square"
+      },
+      "expect": {
+        "contains": [
+          "ปรับภาพนี้ให้สมจริง",
+          "คงหน้า ทรงผม อายุ และตัวตนเดิม",
+          "รายละเอียดผิวเป็นธรรมชาติ"
+        ],
+        "notContains": [
+          "เปลี่ยนชุดเป็น",
+          "เปลี่ยนฉากหลังเป็น"
+        ]
+      }
+    },
+    {
+      "id": "PT02_outfit_location_activity_mood",
+      "name": "Full prompt with outfit, location, activity, mood",
+      "selection": {
+        "clothes": "ชุดไทย",
+        "location": "ต่างประเทศ",
+        "locationSub": "Paris",
+        "activity": "จิบกาแฟ",
+        "activitySub": "",
+        "mood": "ยิ้มน้อยๆ",
+        "ratio": "portrait",
+        "ratioDisplay": "Portrait"
+      },
+      "expect": {
+        "contains": [
+          "เปลี่ยนชุดเป็นชุดไทย",
+          "เปลี่ยนฉากหลังเป็นบรรยากาศต่างประเทศ",
+          "บรรยากาศปารีส",
+          "ท่าทางกำลังจิบกาแฟ",
+          "อารมณ์สีหน้ายิ้มน้อยๆ"
+        ],
+        "notContains": [
+          "ไม่เปลี่ยน"
+        ]
+      }
+    },
+    {
+      "id": "PT03_location_only",
+      "name": "Location-only prompt",
+      "selection": {
+        "clothes": "ไม่เปลี่ยน",
+        "location": "ทะเล",
+        "locationSub": "",
+        "activity": "ไม่ระบุ",
+        "activitySub": "",
+        "mood": "หน้าเรียบเฉย",
+        "ratio": "landscape",
+        "ratioDisplay": "Landscape"
+      },
+      "expect": {
+        "contains": [
+          "เปลี่ยนฉากหลังเป็นทะเล",
+          "อารมณ์สีหน้าเรียบเฉย"
+        ],
+        "notContains": [
+          "เปลี่ยนชุดเป็น"
+        ]
+      }
+    },
+    {
+      "id": "PT04_activity_with_sub",
+      "name": "Activity with sub activity",
+      "selection": {
+        "clothes": "ชุดวัยรุ่น",
+        "location": "คาเฟ่",
+        "locationSub": "",
+        "activity": "โพสท่าสวยๆ",
+        "activitySub": "แคนดิดไม่มองกล้อง",
+        "mood": "ดีใจ",
+        "ratio": "square",
+        "ratioDisplay": "Square"
+      },
+      "expect": {
+        "contains": [
+          "ท่าทางโพสสวยๆ",
+          "แคนดิดไม่มองกล้อง",
+          "อารมณ์สีหน้าดีใจ"
+        ],
+        "notContains": [
+          "ไม่ระบุ"
+        ]
+      }
+    },
+    {
+      "id": "PT05_domestic_sub_location",
+      "name": "Domestic sub-location mapping",
+      "selection": {
+        "clothes": "ชุดไปเที่ยว",
+        "location": "ต่างจังหวัด",
+        "locationSub": "Chiang Mai",
+        "activity": "เดินท่องเที่ยว",
+        "activitySub": "",
+        "mood": "เหม่อมอง",
+        "ratio": "landscape",
+        "ratioDisplay": "Landscape"
+      },
+      "expect": {
+        "contains": [
+          "บรรยากาศเชียงใหม่",
+          "ท่าทางกำลังเดินท่องเที่ยว",
+          "อารมณ์สีหน้าเหม่อมอง"
+        ],
+        "notContains": [
+          "บรรยากาศปารีส"
+        ]
+      }
+    },
+    {
+      "id": "PT06_sleepwear_minimal",
+      "name": "Sleepwear prompt still retains identity",
+      "selection": {
+        "clothes": "ชุดนอน",
+        "location": "ไม่เปลี่ยน",
+        "locationSub": "",
+        "activity": "ไม่ระบุ",
+        "activitySub": "",
+        "mood": "เศร้า",
+        "ratio": "portrait",
+        "ratioDisplay": "Portrait"
+      },
+      "expect": {
+        "contains": [
+          "เปลี่ยนชุดเป็นชุดนอน",
+          "อารมณ์สีหน้าเศร้า",
+          "คงหน้า ทรงผม อายุ และตัวตนเดิม"
+        ],
+        "notContains": [
+          "เปลี่ยนฉากหลังเป็น"
+        ]
+      }
+    },
+    {
+      "id": "PT07_mountain_scene",
+      "name": "Misty mountain scene mapping",
+      "selection": {
+        "clothes": "ชุดไฮโซ",
+        "location": "ภูเขาทะเลหมอก",
+        "locationSub": "",
+        "activity": "แบกเป้เดินทาง",
+        "activitySub": "",
+        "mood": "ถ่ายแบบ",
+        "ratio": "landscape",
+        "ratioDisplay": "Landscape"
+      },
+      "expect": {
+        "contains": [
+          "เปลี่ยนฉากหลังเป็นภูเขาทะเลหมอก",
+          "ท่าทางแบกเป้เดินทาง"
+        ],
+        "notContains": [
+          "ไม่เปลี่ยน"
+        ]
+      }
+    },
+    {
+      "id": "PT08_office_context",
+      "name": "Office outfit prompt",
+      "selection": {
+        "clothes": "ชุดทำงานออฟฟิศ",
+        "location": "คาเฟ่",
+        "locationSub": "",
+        "activity": "จิบกาแฟ",
+        "activitySub": "",
+        "mood": "หน้าเรียบเฉย",
+        "ratio": "square",
+        "ratioDisplay": "Square"
+      },
+      "expect": {
+        "contains": [
+          "เปลี่ยนชุดเป็นชุดทำงานออฟฟิศ",
+          "เปลี่ยนฉากหลังเป็นคาเฟ่",
+          "ท่าทางกำลังจิบกาแฟ"
+        ],
+        "notContains": [
+          "ตุ๊กตา"
+        ]
+      }
+    }
+  ]
+}
