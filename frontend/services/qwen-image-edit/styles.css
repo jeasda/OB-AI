@@ -21,7 +21,7 @@
 
 body {
   margin: 0;
-  font-family: "Kanit", system-ui, -apple-system, sans-serif;
+  font-family: "Noto Sans Thai", "Leelawadee UI", "Segoe UI", Tahoma, sans-serif;
   color: var(--text);
   background: var(--bg);
 }

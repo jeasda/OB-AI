@@ -1,28 +1,32 @@
-name = "ob-ai-api"
+﻿name = "ob-ai-api"
 main = "src/index.ts"
-compatibility_date = "2025-01-14"
+compatibility_date = "2024-12-01"
+pages_build_output_dir = "dist"
 
-# (แนะนำ) ถ้าใช้ node libs บางอย่าง
-compatibility_flags = ["nodejs_compat"]
+[vars]
+ENVIRONMENT = "local"
 
-# -------- D1 --------
 [[d1_databases]]
 binding = "DB"
-database_name = "obastudio-db"
-database_id = "d4c9a2fb-0635-4fcb-bd48-e8faa1a6ae21"
+database_name = "ob-ai-api-dev"
+database_id = "00000000-0000-0000-0000-000000000000"
 
-# -------- R2 --------
 [[r2_buckets]]
 binding = "R2_RESULTS"
-bucket_name = "ob-ai-results"
+bucket_name = "ob-ai-api-results"
 
-# -------- Env --------
-[vars]
-# RunPod Serverless endpoint id (ตามที่ลูกพี่มี)
-RUNPOD_ENDPOINT_ID = "i3qcfgz8v495h"
+[env.production]
+name = "ob-ai-api"
+compatibility_date = "2024-12-01"
 
-# อนุญาต CORS ให้ Pages
-ALLOWED_ORIGINS = "https://ob-ai.pages.dev,http://localhost:3000"
+[env.production.vars]
+ENVIRONMENT = "production"
 
-# โฟลเดอร์ใน R2 สำหรับไฟล์อัปโหลด
-R2_PREFIX = "uploads"
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "ob-ai-api-prod"
+database_id = "00000000-0000-0000-0000-000000000000"
+
+[[env.production.r2_buckets]]
+binding = "R2_RESULTS"
+bucket_name = "ob-ai-api-results"
