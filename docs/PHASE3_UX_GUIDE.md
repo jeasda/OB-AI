@@ -35,3 +35,12 @@
 - [ ] ดาวน์โหลดและเจนใหม่ใช้งานได้
 - [ ] ข้อผิดพลาดมีการกู้คืน
 - [ ] หน้าใช้งานได้บนมือถือ
+
+## Build & Deploy
+- Build command: `npm run buildfrontend`
+- Output: `dist/`
+- Pages ต้องเสิร์ฟจาก `dist` และห้าม commit `dist` ลง git
+
+## Environment Safety
+- ไม่มีการใช้ `VITE_*` ในฝั่ง frontend
+- ข้อมูลลับทั้งหมดอยู่ใน backend เท่านั้น

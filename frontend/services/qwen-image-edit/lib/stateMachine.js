@@ -180,7 +180,7 @@ export function transition(state, context, event) {
 export function deriveFlags(state, context) {
   const hasImage = !!context.imageFile
   const isBusy = state === States.generating || state === States.downloading
-  const canSubmit = hasImage && !isBusy && state !== States.paymentRequired
+  const canSubmit = state === States.readyToGenerate && !isBusy
 
   return {
     hasImage,

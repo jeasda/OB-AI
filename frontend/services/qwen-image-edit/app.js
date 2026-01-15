@@ -287,6 +287,7 @@ function handleFile(file) {
   elements.beforeImage.src = elements.previewThumb.src
   elements.beforePanel.classList.remove('hidden')
   showInlineError('')
+  updateOption('ratio', machine.context.options.ratio)
 }
 
 function handleSubmit() {
@@ -302,7 +303,7 @@ function handleSubmit() {
   if (credits < COST_PER_IMAGE) {
     pendingSubmit = true
     dispatch({ type: Events.openPayment })
-    paymentModal.open(COST_PER_IMAGE)
+    paymentModal.open({ creditsNeeded: COST_PER_IMAGE, balance: credits })
     return
   }
 
@@ -454,6 +455,7 @@ function render() {
   if (flags.showError) {
     showError(machine.context.error || 'เกิดข้อผิดพลาด')
   } else {
+    elements.errorText.textContent = ''
     elements.errorPanel.classList.add('hidden')
   }
 }
@@ -481,6 +483,7 @@ function handleStateChange(prevState, prevContext, nextState, nextContext) {
     resultPanel.setImage(nextContext.resultUrl)
     resultPanel.show()
     saveHistory(nextContext.resultUrl)
+    elements.errorText.textContent = ''
   }
 
   if (nextState === States.error) {
@@ -494,18 +497,19 @@ function updateActionButtons(enabled) {
 }
 
 function setControlsDisabled(disabled) {
+  const hasImage = !!machine.context.imageFile
   elements.fileInput.disabled = disabled
   elements.uploadZone.classList.toggle('is-disabled', disabled)
-  elements.submitBtn.disabled = disabled || !machine.context.imageFile
+  elements.submitBtn.disabled = disabled || !hasImage || !deriveFlags(machine.state, machine.context).canSubmit
 
   const selects = elements.optionsSlot.querySelectorAll('select')
   selects.forEach((select) => {
-    select.disabled = disabled
+    select.disabled = disabled || !hasImage
   })
 
   const ratioButtons = elements.ratioSlot.querySelectorAll('button')
   ratioButtons.forEach((btn) => {
-    btn.disabled = disabled
+    btn.disabled = disabled || !hasImage
   })
 }
 

@@ -22,7 +22,14 @@ export function createPaymentModal({ onClose, onPurchasePackage, onPaySingle }) 
       </div>
       <button id="close-modal" class="btn btn-secondary">ปิด</button>
     </div>
-    <div class="modal-grid">
+
+    <div id="insufficient-panel" class="card" style="margin-top:16px;">
+      <div style="font-weight:600;">เครดิตไม่พอสำหรับดาวน์โหลด</div>
+      <div id="balance-text" class="muted" style="margin-top:4px;"></div>
+      <button id="topup-btn" class="btn btn-primary" style="margin-top:12px;">เติมเครดิต</button>
+    </div>
+
+    <div id="topup-panel" class="modal-grid">
       <div class="panel-section">
         <div class="card">
           <div class="panel-title">สรุปบริการ</div>
@@ -77,14 +84,29 @@ export function createPaymentModal({ onClose, onPurchasePackage, onPaySingle }) 
   const paySingle = modal.querySelector('#pay-single')
   const skipSignup = modal.querySelector('#skip-signup')
   const packageButtons = Array.from(modal.querySelectorAll('.package-btn'))
+  const insufficientPanel = modal.querySelector('#insufficient-panel')
+  const topupPanel = modal.querySelector('#topup-panel')
+  const balanceText = modal.querySelector('#balance-text')
+  const topupBtn = modal.querySelector('#topup-btn')
 
   function setSummary(creditsNeeded) {
     summaryCredits.textContent = `ต้องใช้ ${creditsNeeded} เครดิต`
   }
 
+  function showTopup(show) {
+    if (show) {
+      topupPanel.classList.remove('hidden')
+      insufficientPanel.classList.add('hidden')
+    } else {
+      topupPanel.classList.add('hidden')
+      insufficientPanel.classList.remove('hidden')
+    }
+  }
+
   closeBtn.addEventListener('click', () => onClose())
   skipSignup.addEventListener('click', () => onClose())
   paySingle.addEventListener('click', () => onPaySingle())
+  topupBtn.addEventListener('click', () => showTopup(true))
 
   for (const button of packageButtons) {
     button.addEventListener('click', () => {
@@ -95,8 +117,10 @@ export function createPaymentModal({ onClose, onPurchasePackage, onPaySingle }) 
 
   return {
     el: overlay,
-    open(creditsNeeded) {
+    open({ creditsNeeded, balance }) {
       setSummary(creditsNeeded)
+      balanceText.textContent = `เครดิตคงเหลือ: ${balance} เครดิต`
+      showTopup(false)
       overlay.classList.add('modal-open')
       overlay.setAttribute('aria-hidden', 'false')
     },

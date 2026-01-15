@@ -211,6 +211,13 @@ button:disabled {
   cursor: not-allowed;
 }
 
+select:disabled,
+input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: #f1f5f9;
+}
+
 .preview-card {
   background: linear-gradient(135deg, #ffffff, #f8fafc);
   border-radius: 20px;

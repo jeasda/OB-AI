@@ -11,7 +11,7 @@ export function createResultPanel({ onDownload, onGenerateNew }) {
         <img id="result-image" alt="result" class="result-image">
       </div>
       <div class="panel-section" style="flex-direction:row; gap:12px;">
-        <button id="result-download-btn" class="btn btn-primary">ดาวน์โหลด (มีลายน้ำ)</button>
+        <button id="result-download-btn" class="btn btn-primary">ดาวน์โหลด HD (ใช้ 1 เครดิต)</button>
         <button id="result-generate-btn" class="btn btn-secondary">เจนใหม่</button>
       </div>
     </div>
