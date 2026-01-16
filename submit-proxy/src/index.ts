@@ -184,13 +184,29 @@ export default {
           source
         })
         const raw = await req.text()
-        if (!raw) return json({ error: 'empty body' }, 400)
+        if (!raw) {
+          emitLog('SUBMIT_PROXY_VALIDATE_FAIL', {
+            timestamp: new Date().toISOString(),
+            requestId,
+            reason: 'empty body'
+          })
+          return json({ error: 'empty body' }, 400)
+        }
         let payload: unknown
         try {
           payload = JSON.parse(raw)
         } catch (error: any) {
+          emitLog('SUBMIT_PROXY_VALIDATE_FAIL', {
+            timestamp: new Date().toISOString(),
+            requestId,
+            reason: error?.message || 'invalid json'
+          })
           return json({ error: error?.message || 'invalid json' }, 400)
         }
+        emitLog('SUBMIT_PROXY_VALIDATE_OK', {
+          timestamp: new Date().toISOString(),
+          requestId
+        })
         const authHeader = req.headers.get('authorization') || ''
         const bearerKey = authHeader.toLowerCase().startsWith('bearer ')
           ? authHeader.slice(7).trim()

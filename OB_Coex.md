@@ -977,3 +977,32 @@ Runtime Status
 
 Notes for Next Session
 - Provide RUNPOD_API_KEY to submit proxy or confirm key forwarding to enable NEW_JOB_SUBMITTED
+2026-01-17 0246 Session Summary
+
+Objective
+- Add audit logging and proxy response visibility to isolate 502 cause in production
+
+Actions Performed
+- Files modified: submit-proxy/src/index.ts, src/routes/qwen.image-edit.ts, OB_Coex.md
+- Logic changes: submit proxy emits validate OK/FAIL logs, worker logs API_RECEIVED/API_FORWARD_TO_PROXY/API_PROXY_RESPONSE/API_ERROR
+- Config changes: none
+
+Commands Executed
+- 
+px wrangler deploy --config submit-proxy/wrangler.toml --env production
+- 
+px wrangler deploy --env production
+- curl.exe -s -X POST "https://ob-ai-api.legacy-project.workers.dev/qwen/image-edit" -F "image=@C:\Anti_OB\runninghub-app\tiny.png" -F "prompt=change her outfit color to blue, editorial look, soft contrast"
+
+Validation
+- Verified submit proxy /health and /debug/last-job endpoints respond
+- Observed worker returning 502 with submit proxy 400 status
+- Not tested: successful RunPod submission due to missing proxy API key in production
+
+Runtime Status
+- Production workers deployed (ob-ai-api, ob-ai-submit-proxy)
+- Mock mode OFF (production validation enforced)
+- Worker running
+
+Notes for Next Session
+- Use submit proxy logs to pinpoint 400 cause and confirm API key forwarding

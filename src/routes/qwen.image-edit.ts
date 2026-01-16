@@ -126,11 +126,11 @@ async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
   }
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
-      logEvent("info", "JOB_REQUEST_RECEIVED", {
-        jobId,
+      logEvent("info", "API_RECEIVED", {
+        requestId: jobId,
         timestamp: new Date().toISOString(),
       });
-      logEvent("info", "FORWARDING_TO_SUBMIT_PROXY", {
+      logEvent("info", "API_FORWARD_TO_PROXY", {
         endpoint: env.SUBMIT_PROXY_URL,
         timestamp: new Date().toISOString(),
         attempt,
@@ -146,6 +146,12 @@ async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
         body: JSON.stringify(runpodPayload),
       });
       const proxyText = await proxyRes.text();
+      logEvent("info", "API_PROXY_RESPONSE", {
+        requestId: jobId,
+        status: proxyRes.status,
+        timestamp: new Date().toISOString(),
+        bodyPreview: proxyText.slice(0, 256),
+      });
       if (!proxyRes.ok) {
         const detail = proxyText || `status ${proxyRes.status}`;
         throw new Error(`Submit proxy failed: ${detail}`);
@@ -155,7 +161,7 @@ async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
       break;
     } catch (error: any) {
       lastError = error;
-      logEvent("error", "RUNPOD_SUBMIT_FAILED", {
+      logEvent("error", "API_ERROR", {
         errorMessage: error?.message || "submit proxy failed",
         stack: error?.stack,
         endpoint: env.SUBMIT_PROXY_URL,
