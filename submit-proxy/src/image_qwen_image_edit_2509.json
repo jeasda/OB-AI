@@ -1,0 +1,33 @@
+{
+  "1": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "__INPUT_IMAGE__"
+    }
+  },
+  "2": {
+    "class_type": "QwenImageEdit",
+    "inputs": {
+      "image": [
+        "1",
+        0
+      ],
+      "prompt": "__PROMPT__",
+      "negative_prompt": "__NEGATIVE__",
+      "width": "__WIDTH__",
+      "height": "__HEIGHT__",
+      "steps": "__STEPS__",
+      "cfg": "__CFG__"
+    }
+  },
+  "3": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": [
+        "2",
+        0
+      ],
+      "filename_prefix": "result"
+    }
+  }
+}

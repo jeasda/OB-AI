@@ -1,4 +1,4 @@
-import { qwenImageEditBase } from '../../src/workflows/qwen_image_edit_base'
+import workflowTemplate from './image_qwen_image_edit_2509.json'
 
 type Env = {
   RUNPOD_API_KEY: string
@@ -72,11 +72,22 @@ async function submitToRunPod(env: Env, payload: Record<string, unknown>, reques
     }
   }
   if (!env.RUNPOD_ENDPOINT) {
-    throw new Error('RUNPOD_ENDPOINT is not set')
+    return {
+      error: 'RUNPOD_ENDPOINT_MISSING',
+      message: 'Submit Proxy is not configured with RUNPOD_ENDPOINT'
+    }
   }
   const url = `${runpodBase(env)}/${env.RUNPOD_ENDPOINT}/run`
-  const workflow = JSON.parse(JSON.stringify(qwenImageEditBase))
+  const workflow = JSON.parse(JSON.stringify(workflowTemplate))
   const prompt = typeof (payload as any)?.prompt === 'string' ? String((payload as any).prompt) : ''
+  const imageName = typeof (payload as any)?.image === 'string'
+    ? String((payload as any).image)
+    : typeof (payload as any)?.imageName === 'string'
+      ? String((payload as any).imageName)
+      : 'input.png'
+  if (workflow?.['1']?.inputs) {
+    workflow['1'].inputs.image = imageName
+  }
   if (workflow?.['2']?.inputs) {
     workflow['2'].inputs.prompt = prompt || workflow['2'].inputs.prompt || 'change her outfit color to blue, editorial look, soft contrast'
     workflow['2'].inputs.negative_prompt = workflow['2'].inputs.negative_prompt || ''
@@ -153,7 +164,10 @@ async function getRunPodStatus(env: Env, runpodId: string) {
     }
   }
   if (!env.RUNPOD_ENDPOINT) {
-    throw new Error('RUNPOD_ENDPOINT is not set')
+    return {
+      error: 'RUNPOD_ENDPOINT_MISSING',
+      message: 'Submit Proxy is not configured with RUNPOD_ENDPOINT'
+    }
   }
   const url = `${runpodBase(env)}/${env.RUNPOD_ENDPOINT}/status/${runpodId}`
   const res = await runpodFetch(url, {
@@ -197,7 +211,7 @@ export default {
       }
 
       if (req.method === 'GET' && url.pathname === '/debug/env') {
-        return json({ hasRunpodKey: !!env.RUNPOD_API_KEY })
+        return json({ hasRunpodKey: !!env.RUNPOD_API_KEY, endpoint: env.RUNPOD_ENDPOINT || '' })
       }
 
       if (req.method === 'GET' && url.pathname === '/debug/last-job') {

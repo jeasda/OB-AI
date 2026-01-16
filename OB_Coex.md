@@ -1217,3 +1217,26 @@ Notes for Next Session
 
 ### Notes for Next Session
 - Deploy submit proxy and confirm NEW_JOB_SUBMITTED for workflow-based requests
+## 2026-01-17 0450 Session Summary
+
+### Objective
+- Ensure submit proxy routes respond and RunPod submissions use a real workflow JSON
+
+### Actions Performed
+- Files modified: submit-proxy/src/index.ts, submit-proxy/src/image_qwen_image_edit_2509.json, OB_Coex.md
+- Logic changes: submit proxy builds workflow from JSON template, injects prompt/image defaults, and returns endpoint info in /debug/env
+- Config updates: none
+
+### Commands Executed
+- None
+
+### Validation
+- Not verified in this session
+
+### Runtime Status
+- Production
+- Mock mode OFF
+- Worker running
+
+### Notes for Next Session
+- Deploy submit proxy and verify /health, /debug/env, and RunPod NEW_JOB_SUBMITTED logs
