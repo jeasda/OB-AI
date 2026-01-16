@@ -650,3 +650,33 @@ Notes for Next Session
 - Known limitations: manual browser verification pending
 - Safe next steps: open `https://ob-ai.pages.dev/frontend/services/qwen-image-edit` and run end-to-end flow
 - Warnings or guardrails: Pages serves directly from `frontend/services/qwen-image-edit`
+## 2026-01-17 00:10 Session Summary
+
+### Objective
+- Ensure the Phase 1.1 minimal UI is emitted into dist/frontend/services/qwen-image-edit for Cloudflare Pages
+
+### Actions Performed
+- Files modified: `vite.config.js`, `OB_Coex.md`
+- Logic added / changed: Vite multi-page input targets `frontend/services/qwen-image-edit/index.html` to emit `dist/frontend/services/qwen-image-edit/index.html`
+- Mocks or stubs introduced: none
+- Config updates: adjusted build input path only
+
+### Commands Executed
+- `npm run buildfrontend`
+- `Test-Path dist\frontend\services\qwen-image-edit\index.html`
+- `Get-Date -Format "yyyy-MM-dd HH:mm"`
+
+### Validation
+- What was verified: build output path exists in dist
+- What passed (typecheck, tests, runtime): Vite build succeeded
+- What was NOT tested (if any): live Pages deployment visibility
+
+### Runtime Status
+- Local or Production: local
+- Mock mode ON or OFF: not evaluated
+- Worker running or stopped: stopped
+
+### Notes for Next Session
+- Known limitations: Pages deployment still required to publish dist
+- Safe next steps: deploy Pages and confirm UI at the production URL
+- Warnings or guardrails: do not change Pages config; keep dist path as emitted

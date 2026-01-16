@@ -10,7 +10,7 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        'services/qwen-image-edit/index': resolve(__dirname, 'services', 'qwen-image-edit', 'index.html')
+        'frontend/services/qwen-image-edit/index': resolve(__dirname, 'frontend', 'services', 'qwen-image-edit', 'index.html')
       }
     }
   },
