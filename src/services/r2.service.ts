@@ -43,6 +43,24 @@ export async function putPngBytes(env: Env, bytes: ArrayBuffer | Uint8Array, pre
   return key;
 }
 
+export async function putPngBytesWithKey(env: Env, key: string, bytes: ArrayBuffer | Uint8Array) {
+  const startedAt = Date.now();
+  const body = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+
+  await env.R2_RESULTS.put(key, body, {
+    httpMetadata: { contentType: "image/png" },
+  });
+  logEvent("info", "r2.put", {
+    key,
+    sizeBytes: body.length,
+    latencyMs: Date.now() - startedAt,
+    payloadHash: hashString(key),
+    env: env.ENVIRONMENT || "local",
+  });
+
+  return key;
+}
+
 export async function getPublicUrl(request: Request, key: string) {
   // If you use a public R2 custom domain, replace this logic.
   // For now, return a signed URL-like local pattern (frontend can call /api/result/:key).

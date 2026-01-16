@@ -533,3 +533,35 @@ Notes for Next Session
 - Known limitations: KV binding name may need alignment; mock image generation only
 - Safe next steps: wire real Qwen API and confirm R2 public base URL
 - Warnings or guardrails: ensure `R2_PUBLIC_BASE` and `R2_RESULTS` are bound in production
+## 2026-01-16 23:18 Session Summary
+
+### Objective
+- Implement Phase 1.1 backend async job flow and worker endpoints for Qwen Image Edit
+
+### Actions Performed
+- Files created: `src/services/qwen_jobs.service.ts`, `src/services/qwen_generate.service.ts`, `src/routes/qwen.image-edit.ts`, `src/routes/jobs.status.ts`
+- Files modified: `src/index.ts`, `src/services/r2.service.ts`, `src/env.ts`, `env.d.ts`, `OB_Coex.md`
+- Logic added: job creation, async processing with progress updates, placeholder generation, R2 upload with public URL
+- Mocks or stubs introduced: placeholder image generation in `src/services/qwen_generate.service.ts`
+- Config updates: added optional `R2_PUBLIC_BASE` env reference
+
+### Commands Executed
+- `Get-Content -Path src\index.ts`
+- `Get-Content -Path src\env.ts`
+- `Get-Content -Path env.d.ts`
+- `Get-Date -Format "yyyy-MM-dd HH:mm"`
+
+### Validation
+- What was verified: not run (no automated checks executed)
+- What passed (typecheck, tests, runtime): not run
+- What was NOT tested (if any): API endpoints, R2 upload, job polling
+
+### Runtime Status
+- Local or Production: local
+- Mock mode ON or OFF: mock generation ON
+- Worker running or stopped: stopped
+
+### Notes for Next Session
+- Known limitations: in-memory job store resets on worker restart
+- Safe next steps: deploy and validate R2 public URL accessibility
+- Warnings or guardrails: ensure `R2_PUBLIC_BASE` and `R2_RESULTS` bindings exist in production
