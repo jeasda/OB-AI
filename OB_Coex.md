@@ -1263,6 +1263,41 @@ Notes for Next Session
 
 ### Notes for Next Session
 - Deploy submit proxy and verify /health, /debug/env, and RunPod job creation without 502s
+## 2026-01-17 0538 Session Summary
+
+### Objective
+- Implement R2 pass-by-reference hotfix and capture required production curl outputs
+
+### Actions Performed
+- Files modified: src/routes/queue.ts, src/index.ts, submit-proxy/src/index.ts, wrangler.toml, src/env.ts, OB_Coex.md
+- Logic changes: API worker uploads image to R2 and forwards r2_key/prompt metadata to submit proxy; submit proxy builds image_url payload and injects prompt/image into workflow; added diagnostics endpoints
+- Config updates: added RESULTS_BUCKET binding for API worker
+
+### Commands Executed
+- curl.exe -s https://ob-ai-submit-proxy.legacy-project.workers.dev/health
+- curl.exe -s https://ob-ai-submit-proxy.legacy-project.workers.dev/debug/env
+- curl.exe -s https://ob-ai-api.legacy-project.workers.dev/debug/ping
+- $body = '{"r2_key":"inputs/test/fake.png","prompt":"ping","service":"qwen-image-edit"}'; curl.exe -s -X POST https://ob-ai-submit-proxy.legacy-project.workers.dev/submit -H "Content-Type: application/json" -H "x-request-id: test-req-123" -d $body
+
+### Validation
+- /health output: {"status":"ok","timestamp":"2026-01-16T22:49:57.502Z"}
+- /debug/env output: {"error":"Not Found"}
+- /debug/ping output: {"ok":false,"error":"Not Found","request_id":"9bf12d1919884b59"}
+- /submit output: {"error":"Expected property name or '}' in JSON at position 1 (line 1 column 2)"}
+- Checklist:
+  - /health OK: FAIL
+  - /debug/env OK: FAIL
+  - /submit OK: FAIL
+  - UI Generate OK: FAIL (not tested)
+  - RunPod job visible: FAIL (not tested)
+
+### Runtime Status
+- Production
+- Mock mode OFF
+- Worker running
+
+### Notes for Next Session
+- Deploy updated submit proxy and API worker; re-run curl checks and confirm NEW_JOB_SUBMITTED logs
 ## 2026-01-17 0458 Session Summary
 
 ### Objective

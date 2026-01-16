@@ -37,6 +37,55 @@ function emitLog(event: string, fields: Record<string, unknown>) {
   lastLogs = [...lastLogs.slice(-9), line]
 }
 
+function asString(value: unknown) {
+  return typeof value === 'string' ? value : ''
+}
+
+function cloneWorkflow() {
+  return JSON.parse(JSON.stringify(workflowTemplate))
+}
+
+function setImageUrl(workflow: Record<string, any>, imageUrl: string) {
+  for (const node of Object.values(workflow)) {
+    const classType = asString(node?.class_type).toLowerCase()
+    const inputs = node?.inputs
+    if (!inputs || typeof inputs !== 'object') continue
+    const hasUrl = typeof inputs.url === 'string'
+    const hasImage = typeof inputs.image !== 'undefined'
+    const hasPath = typeof inputs.path === 'string'
+    if (classType.includes('loadimage') || (classType.includes('image') && (hasUrl || hasImage || hasPath))) {
+      if ('url' in inputs) {
+        inputs.url = imageUrl
+      } else if ('image' in inputs) {
+        inputs.image = imageUrl
+      } else if ('path' in inputs) {
+        inputs.path = imageUrl
+      }
+      return true
+    }
+  }
+  return false
+}
+
+function setPromptText(workflow: Record<string, any>, prompt: string) {
+  for (const node of Object.values(workflow)) {
+    const classType = asString(node?.class_type).toLowerCase()
+    const inputs = node?.inputs
+    if (!inputs || typeof inputs !== 'object') continue
+    const hasText = typeof inputs.text === 'string'
+    const hasPrompt = typeof inputs.prompt === 'string'
+    if (classType.includes('prompt') || (classType.includes('text') && hasText) || hasPrompt) {
+      if ('text' in inputs) {
+        inputs.text = prompt
+      } else if ('prompt' in inputs) {
+        inputs.prompt = prompt
+      }
+      return true
+    }
+  }
+  return false
+}
+
 async function runpodFetch(url: string, init: RequestInit) {
   let lastError: unknown = null
   for (let attempt = 1; attempt <= RUNPOD_RETRIES + 1; attempt += 1) {
@@ -89,13 +138,13 @@ async function submitToRunPod(env: Env, payload: Record<string, unknown>, reques
     }
   }
   const url = `${runpodBase(env)}/${env.RUNPOD_ENDPOINT}/run`
-  const workflow = JSON.parse(JSON.stringify(workflowTemplate))
+  const workflow = cloneWorkflow()
   const prompt = typeof (payload as any)?.prompt === 'string' ? String((payload as any).prompt) : ''
   const r2Key = typeof (payload as any)?.r2_key === 'string' ? String((payload as any).r2_key) : ''
-  if (!r2Key) {
+  if (!r2Key || !prompt) {
     return {
       error: 'INVALID_PAYLOAD',
-      message: 'Submit Proxy expects payload.r2_key',
+      message: 'Submit Proxy expects payload.r2_key and prompt',
       status: 400
     }
   }
@@ -107,30 +156,35 @@ async function submitToRunPod(env: Env, payload: Record<string, unknown>, reques
     }
   }
   const imageUrl = `${env.R2_PUBLIC_BASE.replace(/\/+$/, '')}/${r2Key.replace(/^\/+/, '')}`
-  const imageName = typeof (payload as any)?.filename === 'string' ? String((payload as any).filename) : 'input.png'
-  if (workflow?.['1']?.inputs) {
-    workflow['1'].inputs.image = imageUrl
+  const warnings: string[] = []
+  if (!setImageUrl(workflow, imageUrl)) {
+    warnings.push('image-node-not-found')
+    emitLog('WORKFLOW_IMAGE_NODE_MISSING', {
+      requestId: requestId || 'unknown',
+      timestamp: new Date().toISOString()
+    })
   }
-  if (workflow?.['2']?.inputs) {
-    workflow['2'].inputs.prompt = prompt || workflow['2'].inputs.prompt || 'change her outfit color to blue, editorial look, soft contrast'
-    workflow['2'].inputs.negative_prompt = workflow['2'].inputs.negative_prompt || ''
-    workflow['2'].inputs.width = workflow['2'].inputs.width === '__WIDTH__' ? 1024 : workflow['2'].inputs.width
-    workflow['2'].inputs.height = workflow['2'].inputs.height === '__HEIGHT__' ? 1536 : workflow['2'].inputs.height
-    workflow['2'].inputs.steps = workflow['2'].inputs.steps === '__STEPS__' ? 20 : workflow['2'].inputs.steps
-    workflow['2'].inputs.cfg = workflow['2'].inputs.cfg === '__CFG__' ? 4.5 : workflow['2'].inputs.cfg
+  if (!setPromptText(workflow, prompt)) {
+    warnings.push('prompt-node-not-found')
+    emitLog('WORKFLOW_PROMPT_NODE_MISSING', {
+      requestId: requestId || 'unknown',
+      timestamp: new Date().toISOString()
+    })
   }
-  const width = Number(workflow?.['2']?.inputs?.width) || 1024
-  const height = Number(workflow?.['2']?.inputs?.height) || 1536
+  const width = Number((workflow as any)?.['2']?.inputs?.width) || 1024
+  const height = Number((workflow as any)?.['2']?.inputs?.height) || 1536
+  const ratio = typeof (payload as any)?.ratio === 'string' ? (payload as any).ratio : undefined
   const bodyText = JSON.stringify({
     input: {
       workflow,
       prompt,
-      image: imageName,
       image_url: imageUrl,
+      r2_key: r2Key,
       width,
       height,
       service: (payload as any)?.service || 'qwen-image-edit',
       requestId: requestId || (payload as any)?.requestId,
+      ratio,
       mode: 'edit',
       meta: {
         source: 'ob-ai-submit-proxy',
@@ -145,14 +199,29 @@ async function submitToRunPod(env: Env, payload: Record<string, unknown>, reques
     timestamp: new Date().toISOString()
   })
 
-  const res = await runpodFetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`
-    },
-    body: bodyText
-  })
+  let res: Response
+  try {
+    res = await runpodFetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`
+      },
+      body: bodyText
+    })
+  } catch (error: any) {
+    emitLog('RUNPOD_SUBMIT_FAILED', {
+      requestId: requestId || 'unknown',
+      endpoint: env.RUNPOD_ENDPOINT,
+      timestamp: new Date().toISOString(),
+      error: error?.message || 'runpod fetch failed'
+    })
+    return {
+      error: 'RUNPOD_FETCH_FAILED',
+      message: error?.message || 'runpod fetch failed',
+      status: 502
+    }
+  }
   const raw = await res.text()
   if (!res.ok) {
     emitLog('RUNPOD_RESPONSE_ERROR', {
@@ -168,14 +237,15 @@ async function submitToRunPod(env: Env, payload: Record<string, unknown>, reques
       status: res.status
     }
   }
+  const jsonBody = JSON.parse(raw)
+  const runpodId = jsonBody?.id || jsonBody?.job_id
   emitLog('RUNPOD_RESPONSE_OK', {
     requestId: requestId || 'unknown',
     endpoint: env.RUNPOD_ENDPOINT,
     status: res.status,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    runpodJobId: runpodId || null
   })
-  const jsonBody = JSON.parse(raw)
-  const runpodId = jsonBody?.id || jsonBody?.job_id
   if (!runpodId) {
     emitLog('RUNPOD_RESPONSE_ERROR', {
       requestId: requestId || 'unknown',
@@ -202,7 +272,7 @@ async function submitToRunPod(env: Env, payload: Record<string, unknown>, reques
     runpodJobId: runpodId,
     runpodEndpointId: env.RUNPOD_ENDPOINT
   }
-  return jsonBody
+  return { ...jsonBody, warnings, image_url: imageUrl }
 }
 
 async function getRunPodStatus(env: Env, runpodId: string) {
@@ -262,15 +332,15 @@ export default {
 
     try {
       if (req.method === 'GET' && url.pathname === '/health') {
-        return json({ ok: true })
+        return json({ ok: true, service: 'submit-proxy', timestamp: new Date().toISOString() })
       }
 
       if (req.method === 'GET' && url.pathname === '/debug/env') {
         return json({
+          ok: true,
           hasRunpodKey: !!env.RUNPOD_API_KEY,
-          endpoint: env.RUNPOD_ENDPOINT ?? null,
-          r2PublicBaseSet: !!env.R2_PUBLIC_BASE,
-          r2PrefixSet: !!env.R2_PREFIX
+          endpoint: env.RUNPOD_ENDPOINT ?? '',
+          hasR2PublicBase: !!env.R2_PUBLIC_BASE
         })
       }
 
@@ -327,10 +397,12 @@ export default {
           return json({ error: run.error, message: run.message }, run.status || 500)
         }
         return json({
+          ok: true,
           requestId,
-          jobId: run?.id || run?.job_id,
           runpodJobId: run?.id || run?.job_id,
-          runpodRequestId: run?.id || run?.job_id
+          runpodRequestId: run?.id || run?.job_id,
+          image_url: run?.image_url,
+          warnings: run?.warnings || []
         })
       }
 

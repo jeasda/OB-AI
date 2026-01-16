@@ -5,7 +5,6 @@ import { hashString } from "../lib/logger";
 import { compileWorkflow } from "../compiler/workflow";
 import { createJob, setRunPodId, failJob, completeJob, getJob, initDb } from "../services/jobs.service";
 import { getPublicUrl } from "../services/r2.service";
-import { buildWorkflow } from "../services/workflow.builder";
 import { validateWorkflowContractV1, buildWorkflowContext } from "../lib/workflow_contract";
 import { updateJobTimestamp } from "../services/job_timestamps.service";
 
@@ -139,7 +138,7 @@ export async function handleQueueCreate(req: Request, env: Env) {
         timestamp: new Date().toISOString(),
         route: "/api/queue/create",
       });
-      const bucket = env.RESULTS_BUCKET || env.R2_RESULTS;
+      const bucket = env.R2_RESULTS;
       const ext = inferExt(body.imageFile.type);
       const datePrefix = new Date().toISOString().slice(0, 10);
       const key = `${env.R2_PREFIX || "results"}/qwen-image-edit/${datePrefix}/${requestId}.${ext}`;
@@ -167,8 +166,10 @@ export async function handleQueueCreate(req: Request, env: Env) {
       submitUrl.pathname = "/submit";
       const input = {
         requestId,
+        jobId: job.id,
         service: body.service || "qwen-image-edit",
         prompt: body.prompt,
+        ratio: body.ratio,
         r2_key: key,
         contentType: body.imageFile.type || "application/octet-stream",
         filename: body.imageName || body.imageFile.name || `input-${job.id}.${ext}`,
@@ -188,6 +189,7 @@ export async function handleQueueCreate(req: Request, env: Env) {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            "x-request-id": requestId,
           },
           body: JSON.stringify(input),
         });
