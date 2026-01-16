@@ -495,3 +495,41 @@ Notes for Next Session
 - Known limitations: API base URL placeholder must be replaced with the real domain
 - Safe next steps: verify API responses and polling behavior in production
 - Warnings or guardrails: keep UI states aligned with job status responses
+## 2026-01-16 23:10 Session Summary
+
+### Objective
+- Implement Phase 1 backend async job flow for Qwen Image Edit with R2 output and polling endpoints
+
+### Actions Performed
+- Files created: `functions/lib/jobStore.ts`, `functions/lib/qwen.ts`, `functions/lib/r2.ts`, `functions/api/qwen/image-edit.ts`, `functions/api/jobs/[jobId].ts`
+- Logic added: job creation/polling, background processing via waitUntil, mock image generation, R2 upload
+- Mocks or stubs introduced: Qwen image generation returns placeholder PNG
+- Config updates: none
+
+### Commands Executed
+- `Get-ChildItem -Recurse -Force functions\api`
+- `Get-Content -Path functions\api\queue\create.ts`
+- `Get-Content -Path functions\api\queue\status.ts`
+- `Get-Content -Path functions\api\create.ts`
+- `Get-Content -Path functions\api\models\job.ts`
+- `Get-ChildItem -Force functions\api\image | Format-Table -Property Name,FullName`
+- `Get-Content -LiteralPath "C:\Anti_OB\runninghub-app\functions\api\image\[id].ts"`
+- `Get-Content -LiteralPath "C:\Anti_OB\runninghub-app\functions\api\proxy\[[path]].ts"`
+- `Get-Content -Path functions\api\config.ts`
+- `rg -n "DEBUG" -S frontend/services/qwen-image-edit services/qwen-image-edit`
+- `Get-Date -Format "yyyy-MM-dd HH:mm"`
+
+### Validation
+- What was verified: not run (no automated checks executed)
+- What passed (typecheck, tests, runtime): not run
+- What was NOT tested (if any): API endpoints, R2 upload, job polling
+
+### Runtime Status
+- Local or Production: local
+- Mock mode ON or OFF: mock generation ON
+- Worker running or stopped: stopped
+
+### Notes for Next Session
+- Known limitations: KV binding name may need alignment; mock image generation only
+- Safe next steps: wire real Qwen API and confirm R2 public base URL
+- Warnings or guardrails: ensure `R2_PUBLIC_BASE` and `R2_RESULTS` are bound in production
