@@ -802,3 +802,32 @@ Runtime Status
 Notes for Next Session
 - Verify live UI preview/download uses returned outputUrl
 - Confirm RunPod dashboard shows new job timestamps matching UI submissions
+2026-01-17 0118 Session Summary
+
+Objective
+- Ensure Generate always submits a new RunPod job and add explicit submission logging
+
+Actions Performed
+- Files modified: src/routes/qwen.image-edit.ts, src/routes/jobs.status.ts, src/services/qwen_jobs.service.ts, rontend/services/qwen-image-edit/app.js, OB_Coex.md
+- Logic changes: emit NEW_JOB_SUBMITTED log with runpod id and timestamp, ensure frontend disables cache and logs jobId
+- Config changes: none
+
+Commands Executed
+- 
+pm run buildfrontend
+- 
+px wrangler deploy --env production
+- curl.exe -s -X POST "https://ob-ai-api.legacy-project.workers.dev/qwen/image-edit" -F "image=@C:\Anti_OB\runninghub-app\test.png" -F "prompt=change her outfit color to blue, editorial look, soft contrast"
+
+Validation
+- Verified worker deploy completed and POST returned a new jobId
+- Not tested: live Pages UI end-to-end preview/download
+
+Runtime Status
+- Production worker deployed
+- Mock mode OFF (production validation enforced)
+- Worker running
+
+Notes for Next Session
+- Confirm RunPod logs show NEW_JOB_SUBMITTED with current timestamp
+- Verify live UI preview/download uses returned outputUrl

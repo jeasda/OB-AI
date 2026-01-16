@@ -131,7 +131,11 @@ async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
     status: "processing",
     progress: 20,
   });
-  logEvent("info", "qwen.runpod.submitted", { jobId, runpod_id: runpodId });
+  logEvent("info", "NEW_JOB_SUBMITTED", {
+    jobId,
+    runpod_request_id: runpodId,
+    submitted_at_ms: Date.now(),
+  });
 }
 
 export async function handleQwenImageEdit(req: Request, env: Env, ctx: ExecutionContext) {
@@ -154,6 +158,7 @@ export async function handleQwenImageEdit(req: Request, env: Env, ctx: Execution
     }
 
     const job = await createQwenJob(env);
+    logEvent("info", "qwen.job.created", { jobId: job.jobId, created_at_ms: Date.now() });
     ctx.waitUntil(
       processJob(env, job.jobId, payload).catch((error) => {
         updateQwenJob(env, job.jobId, {

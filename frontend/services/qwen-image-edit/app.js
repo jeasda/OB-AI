@@ -251,6 +251,7 @@ async function handleGenerate() {
       throw new Error('Failed to start generation.')
     }
 
+    console.log('NEW_JOB_SUBMITTED', { jobId: data.jobId, submittedAt: new Date().toISOString() })
     transition({ type: 'JOB_ACCEPTED', jobId: data.jobId })
     startPolling()
   } catch (error) {
@@ -316,7 +317,8 @@ function closeLightbox() {
 async function createJobRequest(formData) {
   const response = await fetch(API_CREATE, {
     method: 'POST',
-    body: formData
+    body: formData,
+    cache: 'no-store'
   })
 
   if (!response.ok) {
@@ -327,7 +329,9 @@ async function createJobRequest(formData) {
 }
 
 async function getJobStatus(id) {
-  const response = await fetch(`${API_STATUS}/${encodeURIComponent(id)}`)
+  const response = await fetch(`${API_STATUS}/${encodeURIComponent(id)}`, {
+    cache: 'no-store'
+  })
 
   if (!response.ok) {
     throw new Error('Failed to fetch job status.')
