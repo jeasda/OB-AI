@@ -132,6 +132,13 @@ export async function handleQueueCreate(req: Request, env: Env) {
     }
 
     if (body.imageFile) {
+      if (!env.R2_RESULTS) {
+        logEvent("error", "CONFIG_MISSING_R2_BINDING", {
+          requestId,
+          timestamp: new Date().toISOString(),
+        });
+        throw new Error("API Worker is missing the R2_RESULTS environment binding.");
+      }
       logEvent("info", "API_RECEIVED", {
         requestId,
         trace_id: requestId,

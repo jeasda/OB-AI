@@ -5,4 +5,4 @@ workers_dev = true
 
 [env.production]
 name = "ob-ai-submit-proxy"
-vars = { RUNPOD_ENDPOINT = "i3qcf6gz8v495h", ENVIRONMENT = "production" }
+vars = { RUNPOD_ENDPOINT = "i3qcf6gz8v495h", ENVIRONMENT = "production", R2_PUBLIC_BASE = "https://ob-ai-api.legacy-project.workers.dev/api/result", R2_PREFIX = "results" }

@@ -63,7 +63,7 @@ export default {
     if (
       isProduction(env) &&
       (url.pathname.startsWith("/dev") || url.pathname.startsWith("/debug")) &&
-      !["/debug/submit-proxy-ping", "/debug/ping", "/debug/submit-proxy"].includes(url.pathname)
+      !["/debug/submit-proxy-ping", "/debug/ping", "/debug/submit-proxy", "/debug/r2"].includes(url.pathname)
     ) {
       logEvent("warn", "route.disabled", { requestId, path: url.pathname });
       return errorResponse("Not Found", requestId, 404);
@@ -153,6 +153,9 @@ export default {
         });
         return errorResponse("SUBMIT_PROXY_CALL_FAILED", requestId, 502, { details: error?.message || "ping failed" });
       }
+    }
+    if (req.method === "GET" && url.pathname === "/debug/r2") {
+      return okResponse({ ok: true, hasR2: !!env.R2_RESULTS }, requestId);
     }
 
     logEvent("warn", "route.not_found", { requestId, method: req.method, path: url.pathname });
