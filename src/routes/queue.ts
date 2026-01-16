@@ -68,19 +68,11 @@ async function readCreateInput(req: Request): Promise<CreateBody> {
   };
 }
 
-function uint8ToBase64(bytes: Uint8Array) {
-  let binary = "";
-  const chunk = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunk) {
-    const slice = bytes.subarray(i, i + chunk);
-    binary += String.fromCharCode(...slice);
-  }
-  return btoa(binary);
-}
-
-async function fileToBase64(file: File) {
-  const buffer = await file.arrayBuffer();
-  return uint8ToBase64(new Uint8Array(buffer));
+function inferExt(contentType: string | undefined) {
+  const ct = (contentType || "").toLowerCase();
+  if (ct.includes("png")) return "png";
+  if (ct.includes("jpeg") || ct.includes("jpg")) return "jpg";
+  return "bin";
 }
 
 export async function handleQueueCreate(req: Request, env: Env) {
@@ -141,35 +133,58 @@ export async function handleQueueCreate(req: Request, env: Env) {
     }
 
     if (body.imageFile) {
-      const imageName = body.imageName || `input-${job.id}.png`;
-      const { workflow } = buildWorkflow(
-        {
-          prompt: body.prompt,
-          ratio: (body.ratio as any) || "1:1",
-          model: "qwen-image",
-          steps: body.steps,
-          cfg: body.cfg,
+      logEvent("info", "API_RECEIVED", {
+        requestId,
+        trace_id: requestId,
+        timestamp: new Date().toISOString(),
+        route: "/api/queue/create",
+      });
+      const bucket = env.RESULTS_BUCKET || env.R2_RESULTS;
+      const ext = inferExt(body.imageFile.type);
+      const datePrefix = new Date().toISOString().slice(0, 10);
+      const key = `${env.R2_PREFIX || "results"}/qwen-image-edit/${datePrefix}/${requestId}.${ext}`;
+      const bytes = await body.imageFile.arrayBuffer();
+      logEvent("info", "R2_UPLOAD_START", {
+        requestId,
+        key,
+        bytes: bytes.byteLength,
+        contentType: body.imageFile.type,
+        timestamp: new Date().toISOString(),
+      });
+      await bucket.put(key, bytes, {
+        httpMetadata: {
+          contentType: body.imageFile.type || "application/octet-stream",
         },
-        imageName
-      );
+      });
+      logEvent("info", "R2_UPLOAD_OK", {
+        requestId,
+        key,
+        bytes: bytes.byteLength,
+        timestamp: new Date().toISOString(),
+      });
 
-      const imageBase64 = await fileToBase64(body.imageFile);
+      const submitUrl = new URL(env.SUBMIT_PROXY_URL);
+      submitUrl.pathname = "/submit";
       const input = {
-        workflow,
-        images: [{ name: imageName, image: imageBase64 }],
+        requestId,
         service: body.service || "qwen-image-edit",
+        prompt: body.prompt,
+        r2_key: key,
+        contentType: body.imageFile.type || "application/octet-stream",
+        filename: body.imageName || body.imageFile.name || `input-${job.id}.${ext}`,
+        meta: { environment: env.ENVIRONMENT || "production" },
       };
 
       logEvent("info", "API_FORWARD_TO_SUBMIT_PROXY", {
         requestId,
         trace_id: requestId,
-        url: `${env.SUBMIT_PROXY_URL.replace(/\/$/, "")}/submit`,
+        url: submitUrl.toString(),
         timestamp: new Date().toISOString(),
       });
       let proxyRes: Response;
       let proxyText = "";
       try {
-        proxyRes = await fetch(`${env.SUBMIT_PROXY_URL.replace(/\/$/, "")}/submit`, {
+        proxyRes = await fetch(submitUrl.toString(), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -178,7 +193,7 @@ export async function handleQueueCreate(req: Request, env: Env) {
         });
         proxyText = await proxyRes.text();
       } catch (error: any) {
-        logEvent("error", "SUBMIT_PROXY_CALL_FAILED", {
+        logEvent("error", "API_FAIL", {
           requestId,
           error: error?.message || "submit proxy call failed",
           timestamp: new Date().toISOString(),
@@ -190,18 +205,12 @@ export async function handleQueueCreate(req: Request, env: Env) {
           { details: error?.message || "submit proxy call failed" }
         );
       }
-      logEvent("info", "SUBMIT_PROXY_RESPONSE", {
+      logEvent("info", "API_PROXY_RESPONSE", {
         requestId,
         status: proxyRes.status,
         timestamp: new Date().toISOString(),
       });
       if (!proxyRes.ok) {
-        logEvent("error", "SUBMIT_PROXY_ERROR", {
-          requestId,
-          status: proxyRes.status,
-          body: proxyText,
-          timestamp: new Date().toISOString(),
-        });
         return new Response(proxyText || `status ${proxyRes.status}`, {
           status: proxyRes.status || 502,
           headers: {
@@ -210,7 +219,7 @@ export async function handleQueueCreate(req: Request, env: Env) {
         });
       }
       const proxyJson = JSON.parse(proxyText);
-      const runpodId = proxyJson?.runpodRequestId || proxyJson?.jobId;
+      const runpodId = proxyJson?.runpodJobId || proxyJson?.runpodRequestId || proxyJson?.jobId;
       if (!runpodId) {
         return errorResponse("SUBMIT_PROXY_CALL_FAILED", requestId, 502, { details: "missing job id" });
       }

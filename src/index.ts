@@ -63,7 +63,7 @@ export default {
     if (
       isProduction(env) &&
       (url.pathname.startsWith("/dev") || url.pathname.startsWith("/debug")) &&
-      url.pathname !== "/debug/submit-proxy-ping"
+      !["/debug/submit-proxy-ping", "/debug/ping", "/debug/submit-proxy"].includes(url.pathname)
     ) {
       logEvent("warn", "route.disabled", { requestId, path: url.pathname });
       return errorResponse("Not Found", requestId, 404);
@@ -115,6 +115,34 @@ export default {
           status: res.status,
           timestamp: new Date().toISOString(),
           url: healthUrl,
+        });
+        return okResponse({ status: res.status, body: text }, requestId);
+      } catch (error: any) {
+        logEvent("error", "SUBMIT_PROXY_PING_RESULT", {
+          requestId,
+          error: error?.message || "ping failed",
+          timestamp: new Date().toISOString(),
+        });
+        return errorResponse("SUBMIT_PROXY_CALL_FAILED", requestId, 502, { details: error?.message || "ping failed" });
+      }
+    }
+    if (req.method === "GET" && url.pathname === "/debug/ping") {
+      return okResponse({ ok: true, ts: new Date().toISOString(), env: env.ENVIRONMENT || "production" }, requestId);
+    }
+    if (req.method === "GET" && url.pathname === "/debug/submit-proxy") {
+      if (!env.SUBMIT_PROXY_URL) {
+        return errorResponse("SUBMIT_PROXY_URL is not set", requestId, 500);
+      }
+      try {
+        const healthUrl = new URL(env.SUBMIT_PROXY_URL);
+        healthUrl.pathname = "/health";
+        const res = await fetch(healthUrl.toString());
+        const text = await res.text();
+        logEvent("info", "SUBMIT_PROXY_PING_RESULT", {
+          requestId,
+          status: res.status,
+          timestamp: new Date().toISOString(),
+          url: healthUrl.toString(),
         });
         return okResponse({ status: res.status, body: text }, requestId);
       } catch (error: any) {

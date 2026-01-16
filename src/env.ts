@@ -1,5 +1,6 @@
 export interface Env {
   DB: D1Database;
+  RESULTS_BUCKET: R2Bucket;
   R2_RESULTS: R2Bucket;
   R2_PREFIX: string;
   R2_PUBLIC_BASE?: string;

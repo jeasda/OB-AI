@@ -1286,3 +1286,57 @@ Notes for Next Session
 
 ### Notes for Next Session
 - Deploy submit proxy and verify RunPod job creation with NEW_JOB_SUBMITTED logs
+## 2026-01-17 0534 Session Summary
+
+### Objective
+- Hotfix Phase 1.1 by passing images via R2 and submitting image_url to RunPod
+
+### Actions Performed
+- Files modified: src/routes/queue.ts, src/index.ts, submit-proxy/src/index.ts, wrangler.toml, src/env.ts, OB_Coex.md
+- Logic changes: API worker uploads image to R2 and forwards r2_key/prompt metadata to submit proxy; submit proxy builds image_url payload for RunPod
+- Config updates: added RESULTS_BUCKET binding in wrangler.toml
+
+### Commands Executed
+- None
+
+### Validation
+- Not verified in this session
+
+### Runtime Status
+- Production
+- Mock mode OFF
+- Worker running
+
+### Notes for Next Session
+- Ops checklist:
+  - curl -s https://ob-ai-submit-proxy.legacy-project.workers.dev/health
+  - curl -s https://ob-ai-submit-proxy.legacy-project.workers.dev/debug/env
+  - curl -s https://ob-ai-api.legacy-project.workers.dev/debug/submit-proxy
+  - Trigger Generate in UI and confirm NEW_JOB_SUBMITTED logs
+## 2026-01-17 0503 Session Summary
+
+### Objective
+- Identify the concrete 502 root cause in the submit proxy path
+
+### Actions Performed
+- Files modified: OB_Coex.md
+- Logic changes: none
+- Config updates: none
+
+### Commands Executed
+- curl.exe -s -i "https://ob-ai-submit-proxy.legacy-project.workers.dev/health"
+- curl.exe -s -i "https://ob-ai-submit-proxy.legacy-project.workers.dev/debug/env"
+- curl.exe -s -i -X POST "https://ob-ai-submit-proxy.legacy-project.workers.dev/submit" -H "Content-Type: application/json" -d "{}"
+
+### Validation
+- Observed submit proxy /health responds with legacy payload (status/timestamp)
+- Observed /debug/env returns 404 Not Found
+- Observed /submit returns 500 with "RUNPOD_API_KEY is not set"
+
+### Runtime Status
+- Production
+- Mock mode OFF
+- Worker running
+
+### Notes for Next Session
+- Ensure submit proxy is redeployed with current routes and RUNPOD_API_KEY binding

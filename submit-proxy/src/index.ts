@@ -4,6 +4,8 @@ type Env = {
   RUNPOD_API_KEY: string
   RUNPOD_ENDPOINT: string
   RUNPOD_API_BASE?: string
+  R2_PUBLIC_BASE?: string
+  R2_PREFIX?: string
   ENVIRONMENT?: string
 }
 
@@ -79,14 +81,21 @@ async function submitToRunPod(env: Env, payload: Record<string, unknown>, reques
       status: 502
     }
   }
+  if (!env.R2_PUBLIC_BASE) {
+    return {
+      error: 'R2_PUBLIC_BASE_MISSING',
+      message: 'Submit Proxy is not configured with R2_PUBLIC_BASE',
+      status: 400
+    }
+  }
   const url = `${runpodBase(env)}/${env.RUNPOD_ENDPOINT}/run`
   const workflow = JSON.parse(JSON.stringify(workflowTemplate))
   const prompt = typeof (payload as any)?.prompt === 'string' ? String((payload as any).prompt) : ''
-  const images = Array.isArray((payload as any)?.images) ? (payload as any).images : []
-  if (!images.length || typeof images[0]?.image !== 'string') {
+  const r2Key = typeof (payload as any)?.r2_key === 'string' ? String((payload as any).r2_key) : ''
+  if (!r2Key) {
     return {
       error: 'INVALID_PAYLOAD',
-      message: 'Submit Proxy expects payload.images[0].image',
+      message: 'Submit Proxy expects payload.r2_key',
       status: 400
     }
   }
@@ -97,9 +106,10 @@ async function submitToRunPod(env: Env, payload: Record<string, unknown>, reques
       status: 400
     }
   }
-  const imageName = typeof images[0]?.name === 'string' ? String(images[0].name) : 'input.png'
+  const imageUrl = `${env.R2_PUBLIC_BASE.replace(/\/+$/, '')}/${r2Key.replace(/^\/+/, '')}`
+  const imageName = typeof (payload as any)?.filename === 'string' ? String((payload as any).filename) : 'input.png'
   if (workflow?.['1']?.inputs) {
-    workflow['1'].inputs.image = imageName
+    workflow['1'].inputs.image = imageUrl
   }
   if (workflow?.['2']?.inputs) {
     workflow['2'].inputs.prompt = prompt || workflow['2'].inputs.prompt || 'change her outfit color to blue, editorial look, soft contrast'
@@ -115,9 +125,17 @@ async function submitToRunPod(env: Env, payload: Record<string, unknown>, reques
     input: {
       workflow,
       prompt,
-      image: images[0].image,
+      image: imageName,
+      image_url: imageUrl,
       width,
-      height
+      height,
+      service: (payload as any)?.service || 'qwen-image-edit',
+      requestId: requestId || (payload as any)?.requestId,
+      mode: 'edit',
+      meta: {
+        source: 'ob-ai-submit-proxy',
+        ts: new Date().toISOString()
+      }
     }
   })
   emitLog('RUNPOD_SUBMIT_ATTEMPT', {
@@ -248,7 +266,12 @@ export default {
       }
 
       if (req.method === 'GET' && url.pathname === '/debug/env') {
-        return json({ hasRunpodKey: !!env.RUNPOD_API_KEY, endpoint: env.RUNPOD_ENDPOINT ?? null })
+        return json({
+          hasRunpodKey: !!env.RUNPOD_API_KEY,
+          endpoint: env.RUNPOD_ENDPOINT ?? null,
+          r2PublicBaseSet: !!env.R2_PUBLIC_BASE,
+          r2PrefixSet: !!env.R2_PREFIX
+        })
       }
 
       if (req.method === 'GET' && url.pathname === '/debug/last-job') {

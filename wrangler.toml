@@ -7,6 +7,10 @@ workers_dev = true
 binding = "R2_RESULTS"
 bucket_name = "ob-ai-results"
 
+[[r2_buckets]]
+binding = "RESULTS_BUCKET"
+bucket_name = "ob-ai-results"
+
 
 [env.production]
 name = "ob-ai-api"
@@ -14,4 +18,8 @@ vars = { R2_PUBLIC_BASE = "https://ob-ai-api.legacy-project.workers.dev/api/resu
 
 [[env.production.r2_buckets]]
 binding = "R2_RESULTS"
+bucket_name = "ob-ai-results"
+
+[[env.production.r2_buckets]]
+binding = "RESULTS_BUCKET"
 bucket_name = "ob-ai-results"
