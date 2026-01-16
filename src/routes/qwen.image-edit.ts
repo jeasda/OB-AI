@@ -119,29 +119,26 @@ async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
     service: "qwen-image-edit",
   };
 
-  let run: any = null;
+  let runpodId: string | null = null;
   let lastError: any = null;
+  if (!env.SUBMIT_PROXY_URL) {
+    throw new Error("SUBMIT_PROXY_URL is not set");
+  }
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
-      logEvent("info", "RUNPOD_SUBMIT_ATTEMPT", {
+      logEvent("info", "JOB_REQUEST_RECEIVED", {
+        jobId,
+        timestamp: new Date().toISOString(),
+      });
+      logEvent("info", "FORWARDING_TO_SUBMIT_PROXY", {
         endpoint: env.SUBMIT_PROXY_URL,
-        payloadSize: JSON.stringify(runpodPayload).length,
         timestamp: new Date().toISOString(),
         attempt,
       });
-      if (!env.SUBMIT_PROXY_URL) {
-        throw new Error("SUBMIT_PROXY_URL is not set");
-      }
-      logEvent("info", "FORWARD_TO_SUBMIT_PROXY", {
-        endpoint: env.SUBMIT_PROXY_URL,
-        timestamp: new Date().toISOString(),
-        api_key_present: !!env.RUNPOD_API_KEY,
-      });
-      const proxyRes = await fetch(`${env.SUBMIT_PROXY_URL.replace(/\/$/, "")}/proxy/runpod/submit`, {
+      const proxyRes = await fetch(`${env.SUBMIT_PROXY_URL.replace(/\/$/, "")}/submit`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: env.RUNPOD_API_KEY ? `Bearer ${env.RUNPOD_API_KEY}` : "",
         },
         body: JSON.stringify(runpodPayload),
       });
@@ -151,32 +148,23 @@ async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
         throw new Error(`Submit proxy failed: ${detail}`);
       }
       const proxyJson = JSON.parse(proxyText);
-      run = proxyJson?.runpod;
+      runpodId = proxyJson?.runpodRequestId || proxyJson?.jobId || null;
       break;
     } catch (error: any) {
       lastError = error;
-      logEvent("error", "qwen.runpod.submit_failed", {
-        jobId,
-        attempt,
-        error: error?.message || "runpod submit failed",
+      logEvent("error", "RUNPOD_SUBMIT_FAILED", {
+        errorMessage: error?.message || "submit proxy failed",
+        stack: error?.stack,
+        endpoint: env.SUBMIT_PROXY_URL,
+        timestamp: new Date().toISOString(),
       });
       if (attempt < 3) {
         await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
       }
     }
   }
-  if (!run) {
-    logEvent("error", "RUNPOD_SUBMIT_FAILED", {
-      errorMessage: lastError?.message || "runpod submit failed",
-      stack: lastError?.stack,
-      endpoint: env.SUBMIT_PROXY_URL,
-      timestamp: new Date().toISOString(),
-    });
-    throw new Error(lastError?.message || "RunPod submit failed");
-  }
-  const runpodId = run?.id || run?.job_id || null;
   if (!runpodId) {
-    throw new Error("RunPod did not return a job id");
+    throw new Error(lastError?.message || "Submit proxy failed");
   }
 
   await updateQwenJob(env, jobId, {

@@ -1,7 +1,7 @@
 ﻿import type { Env } from "../env";
 import { errorResponse, getRequestId, okResponse } from "../utils/http";
 import { logEvent } from "../utils/log";
-import { extractBase64Png, extractOutputImageUrl } from "../services/runpod.service";
+import { extractBase64Png, extractOutputImageUrl } from "../services/runpod_helpers";
 import { putPngBase64, putPngBytes, getPublicUrl } from "../services/r2.service";
 import { completeJob, failJob, getJobByRunpodId, initDb } from "../services/jobs.service";
 import { upsertJobMetric } from "../services/metrics.service";

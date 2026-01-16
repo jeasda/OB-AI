@@ -919,3 +919,31 @@ Runtime Status
 Notes for Next Session
 - Provide RUNPOD_API_KEY to submit proxy or confirm secure header forwarding works
 - Verify RunPod job creation logs with NEW_JOB_SUBMITTED and fresh timestamps
+2026-01-17 0207 Session Summary
+
+Objective
+- Enforce submit proxy architecture so Worker never calls RunPod directly
+
+Actions Performed
+- Files modified: src/routes/qwen.image-edit.ts, src/routes/jobs.status.ts, src/routes/queue.ts, src/routes/queue.create.ts, src/routes/runpod.ts, src/routes/runpod-poll.ts, src/routes/runpod.webhook.ts, src/services/runpod.ts, src/services/runpod_helpers.ts, submit-proxy/src/index.ts, submit-proxy/wrangler.toml, wrangler.toml, src/env.ts, env.d.ts, OB_Coex.md
+- Logic changes: Worker forwards submissions and status checks to submit proxy; submit proxy handles RunPod submit/status and logs; removed RunPod service imports from Worker routes
+- Config changes: added SUBMIT_PROXY_URL to production vars
+
+Commands Executed
+- 
+px wrangler deploy --config submit-proxy/wrangler.toml --env production
+- 
+px wrangler deploy --env production
+
+Validation
+- Verified Worker and submit proxy deployments completed
+- Not tested: RunPod submission success (submit proxy still requires RUNPOD_API_KEY secret)
+
+Runtime Status
+- Production workers deployed (ob-ai-api, ob-ai-submit-proxy)
+- Mock mode OFF (production validation enforced)
+- Worker running
+
+Notes for Next Session
+- Ensure RUNPOD_API_KEY secret is set for submit proxy
+- Verify RunPod job creation and timestamps via NEW_JOB_SUBMITTED logs

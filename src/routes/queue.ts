@@ -4,7 +4,6 @@ import { logEvent } from "../utils/log";
 import { hashString } from "../lib/logger";
 import { compileWorkflow } from "../compiler/workflow";
 import { createJob, setRunPodId, failJob, completeJob, getJob, initDb } from "../services/jobs.service";
-import { submitToRunPod } from "../services/runpod.service";
 import { getPublicUrl } from "../services/r2.service";
 import { buildWorkflow } from "../services/workflow.builder";
 import { validateWorkflowContractV1, buildWorkflowContext } from "../lib/workflow_contract";
@@ -99,7 +98,7 @@ export async function handleQueueCreate(req: Request, env: Env) {
     imageType: body.imageFile?.type,
   };
   const payloadText = JSON.stringify(payloadForLog);
-  logEvent("info", "queue.create.request", {
+  logEvent("info", "JOB_REQUEST_RECEIVED", {
     requestId,
     trace_id: requestId,
     route: "/api/queue/create",
@@ -137,6 +136,9 @@ export async function handleQueueCreate(req: Request, env: Env) {
 
   try {
     const mode = env.RUNPOD_MODE || "workflow";
+    if (!env.SUBMIT_PROXY_URL) {
+      throw new Error("SUBMIT_PROXY_URL is not set");
+    }
 
     if (body.imageFile) {
       const imageName = body.imageName || `input-${job.id}.png`;
@@ -158,21 +160,39 @@ export async function handleQueueCreate(req: Request, env: Env) {
         service: body.service || "qwen-image-edit",
       };
 
-      const run = await submitToRunPod(env, input as any) as any;
-      await setRunPodId(env, job.id, run.id!);
+      logEvent("info", "FORWARDING_TO_SUBMIT_PROXY", {
+        requestId,
+        trace_id: requestId,
+        endpoint: env.SUBMIT_PROXY_URL,
+        job_id: job.id,
+        env: env.ENVIRONMENT || "local",
+      });
+      const proxyRes = await fetch(`${env.SUBMIT_PROXY_URL.replace(/\/$/, "")}/submit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      const proxyText = await proxyRes.text();
+      if (!proxyRes.ok) {
+        throw new Error(proxyText || "Submit proxy failed");
+      }
+      const proxyJson = JSON.parse(proxyText);
+      const runpodId = proxyJson?.runpodRequestId || proxyJson?.jobId;
+      if (!runpodId) throw new Error("Submit proxy missing job id");
+      await setRunPodId(env, job.id, runpodId);
       await updateJobTimestamp(env, job.id, { submitted_to_runpod_at_ms: Date.now() });
       logEvent("info", "queue.create.submitted", {
         requestId,
         trace_id: requestId,
         job_id: job.id,
-        runpod_id: run.id,
+        runpod_id: runpodId,
         service: body.service || "qwen-image-edit",
         workflow_version: env.WORKFLOW_VERSION,
         worker_image_tag: env.WORKER_IMAGE_TAG,
-        runpod_endpoint_id: env.RUNPOD_ENDPOINT,
+        runpod_endpoint_id: "submit-proxy",
         env: env.ENVIRONMENT || "local",
       });
-      return okResponse({ job_id: job.id, runpod_id: run.id, status: run.status ?? "SUBMITTED" }, requestId);
+      return okResponse({ job_id: job.id, runpod_id: runpodId, status: "SUBMITTED" }, requestId);
     }
 
     const input =
@@ -180,21 +200,39 @@ export async function handleQueueCreate(req: Request, env: Env) {
         ? { prompt: body.prompt }
         : { workflow: compileWorkflow({ prompt: body.prompt, ratio: body.ratio, seed: body.seed, steps: body.steps, cfg: body.cfg }) };
 
-    const run = await submitToRunPod(env, input as any) as any;
-    await setRunPodId(env, job.id, run.id!);
+    logEvent("info", "FORWARDING_TO_SUBMIT_PROXY", {
+      requestId,
+      trace_id: requestId,
+      endpoint: env.SUBMIT_PROXY_URL,
+      job_id: job.id,
+      env: env.ENVIRONMENT || "local",
+    });
+    const proxyRes = await fetch(`${env.SUBMIT_PROXY_URL.replace(/\/$/, "")}/submit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    const proxyText = await proxyRes.text();
+    if (!proxyRes.ok) {
+      throw new Error(proxyText || "Submit proxy failed");
+    }
+    const proxyJson = JSON.parse(proxyText);
+    const runpodId = proxyJson?.runpodRequestId || proxyJson?.jobId;
+    if (!runpodId) throw new Error("Submit proxy missing job id");
+    await setRunPodId(env, job.id, runpodId);
     await updateJobTimestamp(env, job.id, { submitted_to_runpod_at_ms: Date.now() });
 
     logEvent("info", "queue.create.submitted", {
       requestId,
       trace_id: requestId,
       job_id: job.id,
-      runpod_id: run.id,
+      runpod_id: runpodId,
       workflow_version: env.WORKFLOW_VERSION,
       worker_image_tag: env.WORKER_IMAGE_TAG,
-      runpod_endpoint_id: env.RUNPOD_ENDPOINT,
+      runpod_endpoint_id: "submit-proxy",
       env: env.ENVIRONMENT || "local",
     });
-    return okResponse({ job_id: job.id, runpod_id: run.id, status: run.status ?? "SUBMITTED" }, requestId);
+    return okResponse({ job_id: job.id, runpod_id: runpodId, status: "SUBMITTED" }, requestId);
   } catch (e: any) {
     await failJob(env, job.id, String(e?.message || e));
     logEvent("error", "queue.create.submit_failed", {
@@ -204,7 +242,7 @@ export async function handleQueueCreate(req: Request, env: Env) {
       error: e?.message || e,
       workflow_version: env.WORKFLOW_VERSION,
       worker_image_tag: env.WORKER_IMAGE_TAG,
-      runpod_endpoint_id: env.RUNPOD_ENDPOINT,
+      runpod_endpoint_id: "submit-proxy",
       env: env.ENVIRONMENT || "local",
     });
     return errorResponse(`RunPod submit failed: ${String(e?.message || e)}`, requestId, 502);

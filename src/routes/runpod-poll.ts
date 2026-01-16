@@ -1,8 +1,7 @@
-import { Env } from "../env";
-import {
-  getRunPodStatus,
-  extractOutputImageUrl,
-} from "../services/runpod.service";
+import type { Env } from "../env";
+import { extractOutputImageUrl } from "../services/runpod_helpers";
+import { errorResponse, getRequestId, okResponse } from "../utils/http";
+import { logEvent } from "../utils/log";
 
 export async function handlePoll(
   req: Request,
@@ -10,25 +9,40 @@ export async function handlePoll(
 ): Promise<Response> {
   const url = new URL(req.url);
   const jobId = url.searchParams.get("jobId");
+  const requestId = getRequestId(req);
 
   if (!jobId) {
-    return Response.json({ ok: false, error: "Missing jobId" }, { status: 400 });
+    logEvent("warn", "runpod.poll.missing_job_id", { requestId });
+    return errorResponse("Missing jobId", requestId, 400);
   }
 
-  const status = await getRunPodStatus(env, jobId);
+  if (!env.SUBMIT_PROXY_URL) {
+    return errorResponse("SUBMIT_PROXY_URL is not set", requestId, 500);
+  }
+  logEvent("info", "JOB_STATUS_POLL", {
+    requestId,
+    job_id: jobId,
+    endpoint: env.SUBMIT_PROXY_URL,
+    timestamp: new Date().toISOString(),
+  });
+  const proxyRes = await fetch(`${env.SUBMIT_PROXY_URL.replace(/\/$/, "")}/status/${encodeURIComponent(jobId)}`);
+  const proxyText = await proxyRes.text();
+  if (!proxyRes.ok) {
+    return errorResponse(proxyText || "Submit proxy failed", requestId, 502);
+  }
+  const proxyJson = JSON.parse(proxyText);
+  const status = proxyJson?.status;
 
-  if (status.status !== "COMPLETED") {
-    return Response.json({ ok: true, status: status.status });
+  if (status?.status !== "COMPLETED") {
+    return okResponse({ status: status?.status }, requestId);
   }
 
   const imageUrl = extractOutputImageUrl(status);
   if (!imageUrl) {
-    return Response.json({ ok: false, error: "No output image" });
+    logEvent("error", "runpod.poll.no_output", { requestId, job_id: jobId });
+    return errorResponse("No output image", requestId, 502);
   }
 
-  return Response.json({
-    ok: true,
-    status: "completed",
-    image: imageUrl,
-  });
+  logEvent("info", "runpod.poll.completed", { requestId, job_id: jobId });
+  return okResponse({ status: "completed", image: imageUrl }, requestId);
 }

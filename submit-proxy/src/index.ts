@@ -149,7 +149,7 @@ export default {
     }
 
     try {
-      if (req.method === 'POST' && url.pathname === '/proxy/runpod/submit') {
+      if (req.method === 'POST' && url.pathname === '/submit') {
         console.log(JSON.stringify({
           level: 'info',
           event: 'SUBMIT_PROXY_RECEIVED',
@@ -175,13 +175,20 @@ export default {
           apiKeyLength: apiKey ? apiKey.length : 0
         }))
         const run = await submitToRunPod(env, payload as Record<string, unknown>, apiKey)
-        return json({ runpod: run })
+        return json({
+          jobId: run?.id || run?.job_id,
+          runpodRequestId: run?.id || run?.job_id
+        })
       }
 
-      if (req.method === 'GET' && url.pathname.startsWith('/proxy/runpod/status/')) {
+      if (req.method === 'GET' && url.pathname.startsWith('/status/')) {
         const id = url.pathname.split('/').pop() || ''
         if (!id) return json({ error: 'missing runpod id' }, 400)
-        const apiKey = req.headers.get('x-runpod-api-key') || undefined
+        const authHeader = req.headers.get('authorization') || ''
+        const bearerKey = authHeader.toLowerCase().startsWith('bearer ')
+          ? authHeader.slice(7).trim()
+          : ''
+        const apiKey = bearerKey || req.headers.get('x-runpod-api-key') || undefined
         const status = await getRunPodStatus(env, id, apiKey)
         return json({ status })
       }
