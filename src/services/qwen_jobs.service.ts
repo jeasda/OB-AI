@@ -4,6 +4,7 @@ export type QwenJobStatus = "queued" | "processing" | "uploading" | "done" | "er
 
 export type QwenJob = {
   jobId: string;
+  runpodId?: string | null;
   status: QwenJobStatus;
   progress: number;
   createdAt: string;

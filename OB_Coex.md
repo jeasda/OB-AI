@@ -772,3 +772,33 @@ Runtime Status
 
 Notes for Next Session
 - Verify production UI shows locked prompt and functional upload/generate/preview/download
+2026-01-17 0109 Session Summary
+
+Objective
+- Connect Qwen Image Edit backend to RunPod workflow execution and R2 result handling for Phase 1.1
+
+Actions Performed
+- Files modified: src/routes/qwen.image-edit.ts, src/routes/jobs.status.ts, src/services/qwen_jobs.service.ts, OB_Coex.md
+- Logic changes: submit RunPod workflow with image payload, store runpodId on job, poll RunPod status in /jobs, upload RunPod output to R2 and return public URL
+- Config changes: none
+
+Commands Executed
+- 
+px wrangler deploy --env production
+- curl.exe -s -X POST "https://ob-ai-api.legacy-project.workers.dev/qwen/image-edit" -F "image=@C:\Anti_OB\runninghub-app\test.png" -F "prompt=change her outfit color to blue, editorial look, soft contrast"
+- curl.exe -s "https://ob-ai-api.legacy-project.workers.dev/jobs/ca23c3bd-35d6-4978-ac6f-65216fd8f34b"
+- curl.exe -s -D - -o NUL "https://ob-ai-api.legacy-project.workers.dev/api/result/qwen-image-edit/ca23c3bd-35d6-4978-ac6f-65216fd8f34b.png"
+
+Validation
+- Verified job creation and /jobs polling returns outputUrl
+- Verified outputUrl resolves with image/png response via worker /api/result
+- Not tested: live browser UI on Pages for preview/download
+
+Runtime Status
+- Production worker deployed
+- Mock mode OFF (production validation enforced)
+- Worker running
+
+Notes for Next Session
+- Verify live UI preview/download uses returned outputUrl
+- Confirm RunPod dashboard shows new job timestamps matching UI submissions

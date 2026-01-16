@@ -1,8 +1,9 @@
 import type { Env } from "../env";
 import { getRequestId, jsonResponse } from "../utils/http";
 import { createQwenJob, updateQwenJob } from "../services/qwen_jobs.service";
-import { buildQwenPrompt, generateQwenImage } from "../services/qwen_generate.service";
 import { getPublicUrlForKey, putPngBytesWithKey } from "../services/r2.service";
+import { submitToRunPod, getRunPodStatus, extractBase64Png, extractOutputImageUrl } from "../services/runpod.service";
+import { buildWorkflow } from "../services/workflow.builder";
 import { logEvent } from "../utils/log";
 
 type ParsedRequest = {
@@ -29,6 +30,16 @@ function decodeBase64Image(raw: string) {
     bytes[i] = binary.charCodeAt(i);
   }
   return bytes;
+}
+
+function uint8ToBase64(bytes: Uint8Array) {
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    const slice = bytes.subarray(i, i + chunk);
+    binary += String.fromCharCode(...slice);
+  }
+  return btoa(binary);
 }
 
 function normalizePresets(value: unknown) {
@@ -89,30 +100,38 @@ async function parseRequest(request: Request): Promise<ParsedRequest> {
 }
 
 async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
-  const { image, prompt, presets, options } = payload;
+  const { image, prompt } = payload;
   await updateQwenJob(env, jobId, { status: "processing", progress: 20 });
 
-  const finalPrompt = buildQwenPrompt(
-    "Apply clean, realistic edits while preserving identity and lighting.",
-    prompt,
-    presets,
-    options
+  const imageName = `input-${jobId}.png`;
+  const { workflow } = buildWorkflow(
+    {
+      prompt,
+      ratio: "9:16",
+      model: "qwen-image",
+    },
+    imageName
   );
 
-  const output = await generateQwenImage({ image, prompt: finalPrompt });
+  const imageBase64 = uint8ToBase64(image);
+  const runpodPayload = {
+    workflow,
+    images: [{ name: imageName, image: imageBase64 }],
+    service: "qwen-image-edit",
+  };
 
-  await updateQwenJob(env, jobId, { status: "uploading", progress: 90 });
-
-  const key = `qwen-image-edit/${jobId}.png`;
-  await putPngBytesWithKey(env, key, output);
-  const verify = await env.R2_RESULTS.get(key);
-  if (!verify) {
-    throw new Error("R2 upload verification failed");
+  const run = await submitToRunPod(env, runpodPayload as any);
+  const runpodId = run?.id || run?.job_id || null;
+  if (!runpodId) {
+    throw new Error("RunPod did not return a job id");
   }
-  const outputUrl = getPublicUrlForKey(env, key);
 
-  await updateQwenJob(env, jobId, { status: "done", progress: 100, outputUrl });
-  logEvent("info", "qwen.job.completed", { jobId, outputUrl });
+  await updateQwenJob(env, jobId, {
+    runpodId,
+    status: "processing",
+    progress: 20,
+  });
+  logEvent("info", "qwen.runpod.submitted", { jobId, runpod_id: runpodId });
 }
 
 export async function handleQwenImageEdit(req: Request, env: Env, ctx: ExecutionContext) {
