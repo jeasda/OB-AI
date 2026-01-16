@@ -622,3 +622,31 @@ Notes for Next Session
 - Known limitations: manual browser verification requires interactive access
 - Safe next steps: complete live UI upload, confirm R2 URL opens and download matches preview
 - Warnings or guardrails: keep control panel limited to image + prompt + generate
+## 2026-01-17 00:05 Session Summary
+
+### Objective
+- Minimize the Qwen Image Edit UI to Phase 1.1 requirements in the Pages-served directory
+
+### Actions Performed
+- Files modified: `frontend/services/qwen-image-edit/index.html`, `OB_Coex.md`
+- Logic added / changed: removed showroom/marketing UI and reduced header copy to minimal
+- Mocks or stubs introduced: none
+- Config updates: none
+
+### Commands Executed
+- `Get-Date -Format "yyyy-MM-dd HH:mm"`
+
+### Validation
+- What was verified: not run (no automated checks executed)
+- What passed (typecheck, tests, runtime): not run
+- What was NOT tested (if any): live UI flow, backend job execution, R2 output
+
+### Runtime Status
+- Local or Production: local
+- Mock mode ON or OFF: not evaluated
+- Worker running or stopped: stopped
+
+### Notes for Next Session
+- Known limitations: manual browser verification pending
+- Safe next steps: open `https://ob-ai.pages.dev/frontend/services/qwen-image-edit` and run end-to-end flow
+- Warnings or guardrails: Pages serves directly from `frontend/services/qwen-image-edit`
