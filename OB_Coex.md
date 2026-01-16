@@ -1240,3 +1240,26 @@ Notes for Next Session
 
 ### Notes for Next Session
 - Deploy submit proxy and verify /health, /debug/env, and RunPod NEW_JOB_SUBMITTED logs
+## 2026-01-17 0454 Session Summary
+
+### Objective
+- Ensure submit proxy returns explicit RunPod errors without throwing and exposes endpoint info
+
+### Actions Performed
+- Files modified: submit-proxy/src/index.ts, OB_Coex.md
+- Logic changes: submit proxy returns structured RunPod error payloads, includes runpodJobId in responses, and logs requestId on RunPod errors
+- Config updates: none
+
+### Commands Executed
+- None
+
+### Validation
+- Not verified in this session
+
+### Runtime Status
+- Production
+- Mock mode OFF
+- Worker running
+
+### Notes for Next Session
+- Deploy submit proxy and verify /health, /debug/env, and RunPod job creation without 502s

@@ -68,23 +68,29 @@ async function submitToRunPod(env: Env, payload: Record<string, unknown>, reques
     })
     return {
       error: 'RUNPOD_API_KEY_MISSING',
-      message: 'Submit Proxy is not configured with RUNPOD_API_KEY'
+      message: 'Submit Proxy is not configured with RUNPOD_API_KEY',
+      status: 502
     }
   }
   if (!env.RUNPOD_ENDPOINT) {
     return {
       error: 'RUNPOD_ENDPOINT_MISSING',
-      message: 'Submit Proxy is not configured with RUNPOD_ENDPOINT'
+      message: 'Submit Proxy is not configured with RUNPOD_ENDPOINT',
+      status: 502
     }
   }
   const url = `${runpodBase(env)}/${env.RUNPOD_ENDPOINT}/run`
   const workflow = JSON.parse(JSON.stringify(workflowTemplate))
   const prompt = typeof (payload as any)?.prompt === 'string' ? String((payload as any).prompt) : ''
-  const imageName = typeof (payload as any)?.image === 'string'
-    ? String((payload as any).image)
-    : typeof (payload as any)?.imageName === 'string'
-      ? String((payload as any).imageName)
-      : 'input.png'
+  const images = Array.isArray((payload as any)?.images) ? (payload as any).images : []
+  if (!images.length || typeof images[0]?.image !== 'string') {
+    return {
+      error: 'INVALID_PAYLOAD',
+      message: 'Submit Proxy expects payload.images[0].image',
+      status: 400
+    }
+  }
+  const imageName = typeof images[0]?.name === 'string' ? String(images[0].name) : 'input.png'
   if (workflow?.['1']?.inputs) {
     workflow['1'].inputs.image = imageName
   }
@@ -96,7 +102,7 @@ async function submitToRunPod(env: Env, payload: Record<string, unknown>, reques
     workflow['2'].inputs.steps = workflow['2'].inputs.steps === '__STEPS__' ? 20 : workflow['2'].inputs.steps
     workflow['2'].inputs.cfg = workflow['2'].inputs.cfg === '__CFG__' ? 4.5 : workflow['2'].inputs.cfg
   }
-  const bodyText = JSON.stringify({ input: { workflow } })
+  const bodyText = JSON.stringify({ input: { workflow, images } })
   emitLog('RUNPOD_SUBMIT_ATTEMPT', {
     requestId: requestId || 'unknown',
     endpoint: env.RUNPOD_ENDPOINT,
@@ -115,12 +121,17 @@ async function submitToRunPod(env: Env, payload: Record<string, unknown>, reques
   const raw = await res.text()
   if (!res.ok) {
     emitLog('RUNPOD_RESPONSE_ERROR', {
+      requestId: requestId || 'unknown',
       endpoint: env.RUNPOD_ENDPOINT,
       status: res.status,
       timestamp: new Date().toISOString(),
       bodyPreview: raw.slice(0, 512)
     })
-    throw new Error(raw || 'RunPod API error')
+    return {
+      error: 'RUNPOD_RESPONSE_ERROR',
+      message: raw || 'RunPod API error',
+      status: res.status
+    }
   }
   emitLog('RUNPOD_RESPONSE_OK', {
     requestId: requestId || 'unknown',
@@ -138,7 +149,11 @@ async function submitToRunPod(env: Env, payload: Record<string, unknown>, reques
       timestamp: new Date().toISOString(),
       bodyPreview: raw.slice(0, 512)
     })
-    throw new Error('RunPod response missing job id')
+    return {
+      error: 'RUNPOD_RESPONSE_MISSING_JOB_ID',
+      message: 'RunPod response missing job id',
+      status: 502
+    }
   }
   emitLog('NEW_JOB_SUBMITTED', {
     requestId: requestId || 'unknown',
@@ -160,13 +175,15 @@ async function getRunPodStatus(env: Env, runpodId: string) {
   if (!apiKey) {
     return {
       error: 'RUNPOD_API_KEY_MISSING',
-      message: 'Submit Proxy is not configured with RUNPOD_API_KEY'
+      message: 'Submit Proxy is not configured with RUNPOD_API_KEY',
+      status: 502
     }
   }
   if (!env.RUNPOD_ENDPOINT) {
     return {
       error: 'RUNPOD_ENDPOINT_MISSING',
-      message: 'Submit Proxy is not configured with RUNPOD_ENDPOINT'
+      message: 'Submit Proxy is not configured with RUNPOD_ENDPOINT',
+      status: 502
     }
   }
   const url = `${runpodBase(env)}/${env.RUNPOD_ENDPOINT}/status/${runpodId}`
@@ -178,15 +195,18 @@ async function getRunPodStatus(env: Env, runpodId: string) {
   })
   const raw = await res.text()
   if (!res.ok) {
-    console.error(JSON.stringify({
-      level: 'error',
-      event: 'RUNPOD_RESPONSE_ERROR',
+    emitLog('RUNPOD_RESPONSE_ERROR', {
+      requestId: 'status',
       endpoint: env.RUNPOD_ENDPOINT,
       status: res.status,
       timestamp: new Date().toISOString(),
       bodyPreview: raw.slice(0, 512)
-    }))
-    throw new Error(raw || 'RunPod status error')
+    })
+    return {
+      error: 'RUNPOD_STATUS_ERROR',
+      message: raw || 'RunPod status error',
+      status: res.status
+    }
   }
   return JSON.parse(raw)
 }
@@ -211,7 +231,7 @@ export default {
       }
 
       if (req.method === 'GET' && url.pathname === '/debug/env') {
-        return json({ hasRunpodKey: !!env.RUNPOD_API_KEY, endpoint: env.RUNPOD_ENDPOINT || '' })
+        return json({ hasRunpodKey: !!env.RUNPOD_API_KEY, endpoint: env.RUNPOD_ENDPOINT ?? null })
       }
 
       if (req.method === 'GET' && url.pathname === '/debug/last-job') {
@@ -264,11 +284,12 @@ export default {
         }
         const run = await submitToRunPod(env, payload as Record<string, unknown>, requestId)
         if (run?.error) {
-          return json({ error: run.error, message: run.message }, 503)
+          return json({ error: run.error, message: run.message }, run.status || 500)
         }
         return json({
           requestId,
           jobId: run?.id || run?.job_id,
+          runpodJobId: run?.id || run?.job_id,
           runpodRequestId: run?.id || run?.job_id
         })
       }
@@ -278,7 +299,7 @@ export default {
         if (!id) return json({ error: 'missing runpod id' }, 400)
         const status = await getRunPodStatus(env, id)
         if (status?.error) {
-          return json({ error: status.error, message: status.message }, 503)
+          return json({ error: status.error, message: status.message }, status.status || 500)
         }
         return json({ status })
       }
