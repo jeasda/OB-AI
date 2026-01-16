@@ -169,6 +169,34 @@ export default {
         requestId
       );
     }
+    if (req.method === "POST" && url.pathname === "/debug/submit-proxy") {
+      if (!env.SUBMIT_PROXY_URL) {
+        return errorResponse("SUBMIT_PROXY_URL is not set", requestId, 500);
+      }
+      let payload: Record<string, unknown> = { r2_key: "debug/placeholder.png", prompt: "ping", service: "qwen-image-edit" };
+      try {
+        const raw = await req.text();
+        if (raw) payload = JSON.parse(raw);
+      } catch {
+        // ignore and use default payload
+      }
+      try {
+        const submitUrl = new URL(env.SUBMIT_PROXY_URL);
+        submitUrl.pathname = "/submit";
+        const res = await fetch(submitUrl.toString(), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-request-id": requestId,
+          },
+          body: JSON.stringify(payload),
+        });
+        const text = await res.text();
+        return okResponse({ status: res.status, body: text }, requestId);
+      } catch (error: any) {
+        return errorResponse("SUBMIT_PROXY_CALL_FAILED", requestId, 502, { details: error?.message || "submit proxy call failed" });
+      }
+    }
 
     logEvent("warn", "route.not_found", { requestId, method: req.method, path: url.pathname });
     return errorResponse("Not Found", requestId, 404);

@@ -80,6 +80,12 @@ export async function handleQueueCreate(req: Request, env: Env) {
   await initDb(env);
 
   const body = await readCreateInput(req);
+  logEvent("info", "QUEUE_PARSE_OK", {
+    requestId,
+    timestamp: new Date().toISOString(),
+    hasImage: !!body.imageFile,
+    imageType: body.imageFile?.type,
+  });
   const payloadForLog = {
     prompt: body.prompt,
     ratio: body.ratio,
@@ -169,6 +175,12 @@ export async function handleQueueCreate(req: Request, env: Env) {
         bytes: bytes.byteLength,
         timestamp: new Date().toISOString(),
       });
+      logEvent("info", "R2_UPLOAD_COMPLETE", {
+        requestId,
+        key,
+        bytes: bytes.byteLength,
+        timestamp: new Date().toISOString(),
+      });
 
       const imageName = body.imageName || body.imageFile.name || `input-${job.id}.${ext}`;
       const { workflow } = buildWorkflow(
@@ -227,6 +239,13 @@ export async function handleQueueCreate(req: Request, env: Env) {
         status: proxyRes.status,
         timestamp: new Date().toISOString(),
       });
+      if (proxyRes.ok) {
+        logEvent("info", "API_PROXY_RESPONSE_OK", {
+          requestId,
+          status: proxyRes.status,
+          timestamp: new Date().toISOString(),
+        });
+      }
       if (!proxyRes.ok) {
         return new Response(proxyText || `status ${proxyRes.status}`, {
           status: proxyRes.status || 502,
