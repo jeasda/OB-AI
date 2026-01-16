@@ -747,3 +747,28 @@ px wrangler deploy --env production
 ### Notes for Next Session
 - Ensure Pages UI points to the worker output URL and verify preview/download in browser
 - If R2 public domain is required later, replace /api/result base with actual R2 public domain
+2026-01-17 0104 Session Summary
+
+Objective
+- Lock the Phase 1.1 prompt field to be non-editable and rebuild the frontend output
+
+Actions Performed
+- Files modified: rontend/services/qwen-image-edit/index.html, OB_Coex.md
+- Logic changes: set prompt textarea to readonly for Phase 1.1 requirements
+- Config changes: none
+
+Commands Executed
+- 
+pm run buildfrontend
+
+Validation
+- Verified Vite build emitted dist/frontend/services/qwen-image-edit/index.html
+- Not tested: live Pages UI and end-to-end generate flow
+
+Runtime Status
+- Local build only
+- Mock mode not applicable
+- Worker running status not checked
+
+Notes for Next Session
+- Verify production UI shows locked prompt and functional upload/generate/preview/download
