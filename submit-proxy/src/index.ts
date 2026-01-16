@@ -45,6 +45,12 @@ function cloneWorkflow() {
   return JSON.parse(JSON.stringify(workflowTemplate))
 }
 
+function clonePayloadWorkflow(payload: Record<string, unknown>) {
+  const candidate = (payload as any)?.workflow
+  if (!candidate || typeof candidate !== 'object') return null
+  return JSON.parse(JSON.stringify(candidate))
+}
+
 function setImageUrl(workflow: Record<string, any>, imageUrl: string) {
   for (const node of Object.values(workflow)) {
     const classType = asString(node?.class_type).toLowerCase()
@@ -138,7 +144,7 @@ async function submitToRunPod(env: Env, payload: Record<string, unknown>, reques
     }
   }
   const url = `${runpodBase(env)}/${env.RUNPOD_ENDPOINT}/run`
-  const workflow = cloneWorkflow()
+  const workflow = clonePayloadWorkflow(payload) || cloneWorkflow()
   const prompt = typeof (payload as any)?.prompt === 'string' ? String((payload as any).prompt) : ''
   const r2Key = typeof (payload as any)?.r2_key === 'string' ? String((payload as any).r2_key) : ''
   if (!r2Key || !prompt) {

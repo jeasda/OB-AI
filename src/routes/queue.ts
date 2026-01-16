@@ -5,6 +5,7 @@ import { hashString } from "../lib/logger";
 import { compileWorkflow } from "../compiler/workflow";
 import { createJob, setRunPodId, failJob, completeJob, getJob, initDb } from "../services/jobs.service";
 import { getPublicUrl } from "../services/r2.service";
+import { buildWorkflow } from "../services/workflow.builder";
 import { validateWorkflowContractV1, buildWorkflowContext } from "../lib/workflow_contract";
 import { updateJobTimestamp } from "../services/job_timestamps.service";
 
@@ -169,18 +170,25 @@ export async function handleQueueCreate(req: Request, env: Env) {
         timestamp: new Date().toISOString(),
       });
 
+      const imageName = body.imageName || body.imageFile.name || `input-${job.id}.${ext}`;
+      const { workflow } = buildWorkflow(
+        {
+          prompt: body.prompt,
+          ratio: (body.ratio as any) || "1:1",
+          model: "qwen-image",
+          steps: body.steps,
+          cfg: body.cfg,
+        },
+        imageName
+      );
       const submitUrl = new URL(env.SUBMIT_PROXY_URL);
       submitUrl.pathname = "/submit";
       const input = {
-        requestId,
-        jobId: job.id,
-        service: body.service || "qwen-image-edit",
+        r2_key: key,
         prompt: body.prompt,
         ratio: body.ratio,
-        r2_key: key,
-        contentType: body.imageFile.type || "application/octet-stream",
-        filename: body.imageName || body.imageFile.name || `input-${job.id}.${ext}`,
-        meta: { environment: env.ENVIRONMENT || "production" },
+        service: body.service || "qwen-image-edit",
+        workflow,
       };
 
       logEvent("info", "API_FORWARD_TO_SUBMIT_PROXY", {

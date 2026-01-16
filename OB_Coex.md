@@ -1338,6 +1338,44 @@ Notes for Next Session
 
 ### Notes for Next Session
 - Set RUNPOD_API_KEY secret for ob-ai-submit-proxy and re-run /submit test to confirm NEW_JOB_SUBMITTED
+## 2026-01-17 0624 Session Summary
+
+### Objective
+- Add /debug/env visibility, enforce R2 binding guard, and deploy pass-by-reference flow
+
+### Actions Performed
+- Files modified: src/routes/queue.ts, src/index.ts, submit-proxy/src/index.ts, wrangler.toml, submit-proxy/wrangler.toml, src/env.ts, OB_Coex.md
+- Logic changes: API worker sends r2_key/prompt/ratio/service/workflow to submit proxy; submit proxy injects image_url into workflow and logs warnings; added /debug/env endpoint in API worker
+- Config updates: ensured R2_RESULTS binding and submit proxy vars for R2_PUBLIC_BASE/R2_PREFIX
+
+### Commands Executed
+- npx wrangler deploy --env production
+- npx wrangler deploy --config submit-proxy/wrangler.toml --env production
+- curl.exe -s https://ob-ai-submit-proxy.legacy-project.workers.dev/health
+- curl.exe -s https://ob-ai-submit-proxy.legacy-project.workers.dev/debug/env
+- curl.exe -s https://ob-ai-api.legacy-project.workers.dev/debug/env
+- $body = @{r2_key='inputs/test/fake.png'; prompt='ping'; service='qwen-image-edit'; ratio='9:16'} | ConvertTo-Json -Compress; Set-Content -NoNewline -Path body.json -Value $body; curl.exe -s -X POST https://ob-ai-submit-proxy.legacy-project.workers.dev/submit -H "Content-Type: application/json" -H "x-request-id: test-req-123" --data-binary "@body.json"
+
+### Validation
+- /health output: {"ok":true,"service":"submit-proxy","timestamp":"2026-01-16T23:23:41.186Z"}
+- /debug/env (submit-proxy) output: {"ok":true,"hasRunpodKey":false,"endpoint":"i3qcf6gz8v495h","hasR2PublicBase":true}
+- /debug/env (ob-ai-api) output: {"ok":true,"request_id":"9bf15d086fc6f305","hasR2":true,"r2Type":"object","envKeys":["ENVIRONMENT","R2_PREFIX","R2_PUBLIC_BASE","R2_RESULTS","RESULTS_BUCKET","RUNPOD_API_KEY","RUNPOD_ENDPOINT","SUBMIT_PROXY_URL"]}
+- /submit output: {"error":"RUNPOD_API_KEY_MISSING","message":"Submit Proxy is not configured with RUNPOD_API_KEY"}
+- Checklist:
+  - /health OK: PASS
+  - /debug/env OK: FAIL (hasRunpodKey false)
+  - /debug/env (API) OK: PASS
+  - /submit OK: FAIL (missing RUNPOD_API_KEY)
+  - UI Generate OK: FAIL (not tested)
+  - RunPod job visible: FAIL (blocked by missing RUNPOD_API_KEY)
+
+### Runtime Status
+- Production
+- Mock mode OFF
+- Worker running
+
+### Notes for Next Session
+- Bind RUNPOD_API_KEY secret to ob-ai-submit-proxy and re-run submit test to reach NEW_JOB_SUBMITTED
 ## 2026-01-17 0458 Session Summary
 
 ### Objective
