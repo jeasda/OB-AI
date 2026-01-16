@@ -565,3 +565,31 @@ Notes for Next Session
 - Known limitations: in-memory job store resets on worker restart
 - Safe next steps: deploy and validate R2 public URL accessibility
 - Warnings or guardrails: ensure `R2_PUBLIC_BASE` and `R2_RESULTS` bindings exist in production
+## 2026-01-16 23:25 Session Summary
+
+### Objective
+- Verify R2 public output handling and ensure outputUrl is logged and returned for Qwen image edit jobs
+
+### Actions Performed
+- Files modified: `src/services/r2.service.ts`, `src/routes/qwen.image-edit.ts`, `src/index.ts`, `OB_Coex.md`
+- Logic added: public URL helper with required `R2_PUBLIC_BASE`, completion log entry for outputUrl
+- Mocks or stubs introduced: none
+- Config updates: enforce `R2_PUBLIC_BASE` in env validation
+
+### Commands Executed
+- `Get-Date -Format "yyyy-MM-dd HH:mm"`
+
+### Validation
+- What was verified: not run (no automated checks executed)
+- What passed (typecheck, tests, runtime): not run
+- What was NOT tested (if any): live API calls, R2 public URL access, UI preview rendering
+
+### Runtime Status
+- Local or Production: local
+- Mock mode ON or OFF: mock generation ON
+- Worker running or stopped: stopped
+
+### Notes for Next Session
+- Known limitations: live endpoint base and R2 public URL not verified in this environment
+- Safe next steps: deploy and test with real Worker URL + R2 public domain
+- Warnings or guardrails: ensure `R2_PUBLIC_BASE` points to a public R2 domain

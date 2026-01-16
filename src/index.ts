@@ -31,11 +31,12 @@ function validateEnv(env: Env): EnvValidation {
   }
 
   const missing: string[] = [];
-  if (production || !mockMode) {
-    if (!env.RUNPOD_API_KEY) missing.push("RUNPOD_API_KEY");
-    if (!env.RUNPOD_ENDPOINT) missing.push("RUNPOD_ENDPOINT");
-    if (!env.R2_PREFIX) missing.push("R2_PREFIX");
-  }
+    if (production || !mockMode) {
+      if (!env.RUNPOD_API_KEY) missing.push("RUNPOD_API_KEY");
+      if (!env.RUNPOD_ENDPOINT) missing.push("RUNPOD_ENDPOINT");
+      if (!env.R2_PREFIX) missing.push("R2_PREFIX");
+      if (!env.R2_PUBLIC_BASE) missing.push("R2_PUBLIC_BASE");
+    }
 
   if (missing.length > 0) {
     return { ok: false, error: `Missing required env: ${missing.join(", ")}`, missing };

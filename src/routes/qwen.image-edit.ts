@@ -2,7 +2,8 @@ import type { Env } from "../env";
 import { getRequestId, jsonResponse } from "../utils/http";
 import { createQwenJob, updateQwenJob } from "../services/qwen_jobs.service";
 import { buildQwenPrompt, generateQwenImage } from "../services/qwen_generate.service";
-import { putPngBytesWithKey } from "../services/r2.service";
+import { getPublicUrlForKey, putPngBytesWithKey } from "../services/r2.service";
+import { logEvent } from "../utils/log";
 
 type ParsedRequest = {
   image: Uint8Array;
@@ -104,10 +105,10 @@ async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
 
   const key = `qwen-image-edit/${jobId}.png`;
   await putPngBytesWithKey(env, key, output);
-  const base = env.R2_PUBLIC_BASE ? String(env.R2_PUBLIC_BASE).replace(/\/$/, "") : "";
-  const outputUrl = base ? `${base}/${key}` : `/api/result/${encodeURIComponent(key)}`;
+  const outputUrl = getPublicUrlForKey(env, key);
 
   updateQwenJob(jobId, { status: "done", progress: 100, outputUrl });
+  logEvent("info", "qwen.job.completed", { jobId, outputUrl });
 }
 
 export async function handleQwenImageEdit(req: Request, env: Env, ctx: ExecutionContext) {

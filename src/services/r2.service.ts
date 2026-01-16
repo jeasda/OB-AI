@@ -61,6 +61,13 @@ export async function putPngBytesWithKey(env: Env, key: string, bytes: ArrayBuff
   return key;
 }
 
+export function getPublicUrlForKey(env: Env, key: string) {
+  if (!env.R2_PUBLIC_BASE) {
+    throw new Error("R2_PUBLIC_BASE is not set");
+  }
+  return `${String(env.R2_PUBLIC_BASE).replace(/\/$/, "")}/${key}`;
+}
+
 export async function getPublicUrl(request: Request, key: string) {
   // If you use a public R2 custom domain, replace this logic.
   // For now, return a signed URL-like local pattern (frontend can call /api/result/:key).
