@@ -232,7 +232,7 @@ export default {
         }
         const run = await submitToRunPod(env, payload as Record<string, unknown>, requestId)
         if (run?.error) {
-          return json({ error: run.error }, 502)
+          return json({ error: run.error }, 500)
         }
         return json({
           requestId,
@@ -246,7 +246,7 @@ export default {
         if (!id) return json({ error: 'missing runpod id' }, 400)
         const status = await getRunPodStatus(env, id)
         if (status?.error) {
-          return json({ error: status.error }, 502)
+          return json({ error: status.error }, 500)
         }
         return json({ status })
       }

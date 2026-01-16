@@ -1148,3 +1148,26 @@ Notes for Next Session
 
 ### Notes for Next Session
 - Deploy submit proxy and worker, then check /health and /debug/env for RunPod key presence
+## 2026-01-17 0351 Session Summary
+
+### Objective
+- Align submit proxy missing-key behavior with Phase 1.1 runtime hardening
+
+### Actions Performed
+- Files modified: submit-proxy/src/index.ts, OB_Coex.md
+- Logic changes: return HTTP 500 for missing RUNPOD_API_KEY in submit and status flows
+- Config updates: none
+
+### Commands Executed
+- None
+
+### Validation
+- Not verified in this session
+
+### Runtime Status
+- Production
+- Mock mode OFF
+- Worker running
+
+### Notes for Next Session
+- Deploy submit proxy and verify /debug/env shows hasRunpodKey true before submitting jobs
