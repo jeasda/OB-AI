@@ -64,7 +64,10 @@ async function submitToRunPod(env: Env, payload: Record<string, unknown>, reques
       requestId: requestId || 'unknown',
       timestamp: new Date().toISOString()
     })
-    return { error: 'RUNPOD_API_KEY missing in submit-proxy runtime' }
+    return {
+      error: 'RUNPOD_API_KEY_MISSING',
+      message: 'Submit Proxy is not configured with RUNPOD_API_KEY'
+    }
   }
   if (!env.RUNPOD_ENDPOINT) {
     throw new Error('RUNPOD_ENDPOINT is not set')
@@ -132,7 +135,10 @@ async function submitToRunPod(env: Env, payload: Record<string, unknown>, reques
 async function getRunPodStatus(env: Env, runpodId: string) {
   const apiKey = env.RUNPOD_API_KEY
   if (!apiKey) {
-    return { error: 'RUNPOD_API_KEY missing in submit-proxy runtime' }
+    return {
+      error: 'RUNPOD_API_KEY_MISSING',
+      message: 'Submit Proxy is not configured with RUNPOD_API_KEY'
+    }
   }
   if (!env.RUNPOD_ENDPOINT) {
     throw new Error('RUNPOD_ENDPOINT is not set')
@@ -175,11 +181,11 @@ export default {
 
     try {
       if (req.method === 'GET' && url.pathname === '/health') {
-        return json({ ok: true, timestamp: new Date().toISOString() })
+        return json({ ok: true })
       }
 
       if (req.method === 'GET' && url.pathname === '/debug/env') {
-        return json({ hasRunpodKey: !!env.RUNPOD_API_KEY, timestamp: new Date().toISOString() })
+        return json({ hasRunpodKey: !!env.RUNPOD_API_KEY })
       }
 
       if (req.method === 'GET' && url.pathname === '/debug/last-job') {
@@ -232,7 +238,7 @@ export default {
         }
         const run = await submitToRunPod(env, payload as Record<string, unknown>, requestId)
         if (run?.error) {
-          return json({ error: run.error }, 500)
+          return json({ error: run.error, message: run.message }, 503)
         }
         return json({
           requestId,
@@ -246,7 +252,7 @@ export default {
         if (!id) return json({ error: 'missing runpod id' }, 400)
         const status = await getRunPodStatus(env, id)
         if (status?.error) {
-          return json({ error: status.error }, 500)
+          return json({ error: status.error, message: status.message }, 503)
         }
         return json({ status })
       }

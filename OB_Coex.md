@@ -1171,3 +1171,26 @@ Notes for Next Session
 
 ### Notes for Next Session
 - Deploy submit proxy and verify /debug/env shows hasRunpodKey true before submitting jobs
+## 2026-01-17 0355 Session Summary
+
+### Objective
+- Return transparent 503 errors when RUNPOD_API_KEY is missing and expose minimal diagnostics
+
+### Actions Performed
+- Files modified: submit-proxy/src/index.ts, OB_Coex.md
+- Logic changes: submit proxy returns structured 503 for missing key, /health and /debug/env return minimal fields
+- Config updates: none
+
+### Commands Executed
+- None
+
+### Validation
+- Not verified in this session
+
+### Runtime Status
+- Production
+- Mock mode OFF
+- Worker running
+
+### Notes for Next Session
+- Deploy submit proxy and verify missing key returns 503 with RUNPOD_API_KEY_MISSING
