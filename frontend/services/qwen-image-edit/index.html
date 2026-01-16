@@ -1,125 +1,243 @@
-﻿<!DOCTYPE html>
-<html lang="th">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Qwen Image Edit | OB AI Studio</title>
-  <link rel="icon" type="image/png" href="/logo.png">
-  <link rel="stylesheet" href="./styles.css">
-</head>
-<body>
-  <div class="page">
-    <header class="header">
-      <div class="brand">
-        <img src="/logo.png" alt="OB AI Studio" class="brand-logo">
-        <div>
-          <div class="brand-title">OB AI Studio</div>
-          <div class="brand-subtitle">Qwen Image Edit</div>
-        </div>
-      </div>
-      <div class="header-actions">
-        <div id="state-pill" class="pill"></div>
-        <div id="credit-pill" class="pill"></div>
-        <button class="icon-btn">เข้าสู่ระบบ</button>
-      </div>
-    </header>
-
-    <main class="layout">
-      <aside class="panel panel-section">
-        <div>
-          <div class="panel-title">ตั้งค่า</div>
-          <h2>อัปโหลดภาพ</h2>
-          <p class="muted">รองรับ JPG/PNG ขนาดไม่เกิน 10MB</p>
-        </div>
-
-        <div id="upload-zone" class="upload-zone">
-          <div>ลากภาพมาวาง หรือกดเพื่อเลือกไฟล์</div>
-          <div class="muted">ระบบจะปรับภาพด้วย Qwen</div>
-          <input id="file-input" type="file" accept="image/png,image/jpeg" hidden>
-          <img id="preview-thumb" alt="preview" class="upload-thumb hidden">
-        </div>
-
-        <div class="panel-section">
-          <div class="panel-title">ตัวเลือก</div>
-          <div class="panel">
-            <strong>ขั้นที่ 2: เลือกพื้นที่</strong>
-            <div class="muted">ตอนนี้ระบบใช้ทั้งภาพ ไม่ต้องวาดมาสก์</div>
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Qwen Image Edit | OB AI Studio</title>
+    <link rel="icon" type="image/png" href="/logo.png">
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+          <div class="brand-mark">OB</div>
+          <div class="brand-text">
+            <div class="brand-title">OB AI Studio</div>
+            <div class="brand-subtitle">Services</div>
           </div>
-          <div id="options-slot" class="panel-section"></div>
+        </div>
+        <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </button>
+        <nav class="sidebar-nav">
+          <a class="sidebar-item" href="/">
+            <span class="icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 10.5 12 4l8 6.5v8.5a1 1 0 0 1-1 1h-5.5v-6h-3v6H5a1 1 0 0 1-1-1z" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linejoin="round"/>
+              </svg>
+            </span>
+            <span class="label">Home</span>
+          </a>
+          <a class="sidebar-item active" href="/services/qwen-image-edit/">
+            <span class="icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4.5 6.5h15v11h-15z" stroke="currentColor" stroke-width="1.4" fill="none"/>
+                <path d="M7.5 14.5 11 11l3 3 2-2 2.5 2.5" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+            <span class="label">Qwen Image Edit</span>
+          </a>
+          <a class="sidebar-item" href="/admin">
+            <span class="icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M6 7h12M6 12h12M6 17h12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+              </svg>
+            </span>
+            <span class="label">Jobs</span>
+          </a>
+        </nav>
+        <div class="sidebar-footer">
+          <div class="sidebar-note">Production ready</div>
+        </div>
+      </aside>
+
+      <section class="control-panel">
+        <header class="panel-header">
+          <span class="eyebrow">Qwen Image Edit</span>
+          <h1>Precision edits with a single prompt.</h1>
+          <p class="muted">Upload an image, describe the change, and let the model deliver a clean result.</p>
+        </header>
+
+        <div id="upload-zone" class="panel-card upload-card" role="button" tabindex="0">
+          <div class="upload-content">
+            <div class="upload-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 4v10M8 8l4-4 4 4" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div>
+              <div class="upload-title">Drop image here</div>
+              <div class="upload-subtitle">PNG or JPG up to 10MB</div>
+            </div>
+          </div>
+          <input id="file-input" type="file" accept="image/png,image/jpeg" hidden>
+          <img id="upload-preview" class="upload-preview hidden" alt="Uploaded preview">
+          <div id="upload-meta" class="upload-meta hidden">
+            <span id="upload-name"></span>
+            <span id="upload-size"></span>
+          </div>
         </div>
 
-        <div class="panel-section">
-          <label class="field-label" for="prompt-input">เขียนสิ่งที่อยากแก้ไข</label>
-          <textarea id="prompt-input" class="prompt-input" rows="3" placeholder="เช่น เปลี่ยนชุดเป็นชุดไปเที่ยว แสงอุ่นๆ"></textarea>
+        <div class="panel-card">
+          <label class="field-label" for="prompt-input">Prompt</label>
+          <textarea
+            id="prompt-input"
+            class="prompt-input"
+            rows="4"
+            placeholder="e.g. Replace the background with a matte charcoal studio wall">
+          </textarea>
         </div>
 
-        <div id="ratio-slot" class="panel-section"></div>
+        <div class="panel-card">
+          <div class="card-head">
+            <span class="field-label">Presets</span>
+            <span class="muted">Optional</span>
+          </div>
+          <div id="preset-chips" class="chip-row">
+            <button class="chip" type="button" data-prompt="cinematic lighting">Cinematic</button>
+            <button class="chip" type="button" data-prompt="product shot, clean backdrop">Product</button>
+            <button class="chip" type="button" data-prompt="editorial look, soft contrast">Editorial</button>
+            <button class="chip" type="button" data-prompt="night city glow">Night Glow</button>
+            <button class="chip" type="button" data-prompt="warm film tones">Film Warmth</button>
+          </div>
+        </div>
 
-        <details id="prompt-preview" class="panel">
-          <summary>Prompt ที่จะใช้</summary>
-          <div class="muted" style="margin-top: 8px;">
-            <div id="prompt-preview-text"></div>
-            <div id="prompt-preview-tags" style="margin-top: 8px;"></div>
+        <details class="panel-card advanced" id="advanced-options">
+          <summary>
+            <span>Advanced options</span>
+            <span class="muted">Ratio, detail, lighting</span>
+          </summary>
+          <div class="advanced-body">
+            <div class="field">
+              <label class="field-label" for="ratio-select">Aspect ratio</label>
+              <select id="ratio-select" class="select-input">
+                <option value="1:1" selected>1:1 Square</option>
+                <option value="4:5">4:5 Portrait</option>
+                <option value="3:4">3:4 Portrait</option>
+                <option value="16:9">16:9 Landscape</option>
+                <option value="9:16">9:16 Story</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="field-label" for="detail-strength">Detail strength</label>
+              <div class="range-row">
+                <input id="detail-strength" type="range" min="0" max="100" value="60">
+                <span id="detail-value" class="range-value">60</span>
+              </div>
+            </div>
+            <div class="field toggle-field">
+              <input id="preserve-lighting" type="checkbox" checked>
+              <label for="preserve-lighting">Preserve original lighting</label>
+            </div>
           </div>
         </details>
 
-        <div class="panel-section">
-          <button id="submit-btn" class="btn btn-primary">เริ่มแก้ไขภาพ</button>
-          <div id="inline-error" class="muted" style="color:#b91c1c;"></div>
-          <div class="muted">โหมดทดสอบ: ระบบชำระเงินจำลองและยังไม่ตัดเงินจริง</div>
-        </div>
-      </aside>
-
-      <section class="panel-section">
-        <div id="marketing-panel" class="preview-card">
-          <div class="panel-title">Qwen Image Edit</div>
-          <h1>แก้ไขภาพให้เป็นสไตล์ใหม่แบบสมจริง</h1>
-          <p class="muted">เลือกชุด โลเคชัน อารมณ์ และท่าทาง แล้วให้ Qwen จัดการให้จบในไม่กี่ขั้นตอน</p>
-          <div class="panel-section" style="gap: 12px;">
-            <div class="panel">
-              <strong>1. อัปโหลดภาพ</strong>
-              <div class="muted">ภาพหน้าชัด แสงดี จะได้ผลลัพธ์สวยขึ้น</div>
-            </div>
-            <div class="panel">
-              <strong>2. เลือกตัวเลือก</strong>
-              <div class="muted">กำหนดชุด ฉาก และอารมณ์ที่ต้องการ</div>
-            </div>
-            <div class="panel">
-              <strong>3. เริ่มแก้ไข</strong>
-              <div class="muted">รอไม่กี่นาที ระบบจะเตรียมภาพให้</div>
-            </div>
-          </div>
-        </div>
-
-        <div id="before-after" class="panel hidden">
-          <div class="panel-title">ภาพต้นฉบับ</div>
-          <div class="mask-stage">
-            <img id="before-image" alt="before" class="upload-thumb">
-            <canvas id="mask-canvas" class="mask-canvas"></canvas>
-            <div id="mask-hint" class="mask-hint">ระบายส่วนที่ต้องการแก้ไข</div>
-          </div>
-        </div>
-
-        <div id="progress-slot"></div>
-        <div id="result-slot"></div>
-
-        <div id="error-panel" class="error-box hidden">
-          <div id="error-text"></div>
-          <button id="retry-btn" class="btn btn-secondary" style="margin-top: 12px;">ลองอีกครั้ง</button>
+        <div class="action-stack">
+          <button id="generate-btn" class="btn-primary" disabled>Generate</button>
+          <div id="inline-error" class="inline-error"></div>
         </div>
       </section>
 
-      <aside class="panel panel-section">
-        <div class="panel-title">ผลลัพธ์</div>
-        <button id="download-btn" class="btn btn-secondary">ดาวน์โหลด HD (ใช้ 1 เครดิต)</button>
-        <button id="generate-new-btn" class="btn btn-secondary">เจนใหม่</button>
-        <div id="credit-rail" class="muted"></div>
-      </aside>
-    </main>
-  </div>
+      <section class="output-panel" aria-live="polite">
+        <div id="state-showroom" class="state state-showroom is-active">
+          <div class="hero-card">
+            <div class="hero-visual">
+              <div class="hero-badge">Mock Result</div>
+              <div class="hero-gradient"></div>
+            </div>
+            <div class="hero-copy">
+              <h2>Studio-grade edits without the busy work.</h2>
+              <p class="muted">
+                Qwen Image Edit keeps edges clean and tones consistent, so your final assets look intentional
+                and brand-ready.
+              </p>
+            </div>
+          </div>
 
-  <div id="payment-modal-root"></div>
+          <div class="comparison-card">
+            <div class="comparison-header">
+              <h3>Before / After</h3>
+              <span class="muted">Subtle cleanup, sharp detail</span>
+            </div>
+            <div class="comparison-grid">
+              <div class="comparison-block">
+                <span>Before</span>
+                <div class="comparison-frame"></div>
+              </div>
+              <div class="comparison-block after">
+                <span>After</span>
+                <div class="comparison-frame"></div>
+              </div>
+            </div>
+          </div>
 
-  <script type="module" src="./app.js"></script>
-</body>
+          <div class="guide-card">
+            <div class="guide-step">
+              <span class="step-number">1</span>
+              <div>
+                <div class="step-title">Upload</div>
+                <div class="muted">Drag or click to add your source image.</div>
+              </div>
+            </div>
+            <div class="guide-step">
+              <span class="step-number">2</span>
+              <div>
+                <div class="step-title">Describe</div>
+                <div class="muted">Write a precise change or select a preset.</div>
+              </div>
+            </div>
+            <div class="guide-step">
+              <span class="step-number">3</span>
+              <div>
+                <div class="step-title">Generate</div>
+                <div class="muted">Receive a clean, controlled edit in seconds.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="state-processing" class="state state-processing">
+          <div class="processing-card">
+            <div class="processing-header">
+              <span class="muted">Processing</span>
+              <span id="progress-percent" class="progress-percent">0%</span>
+            </div>
+            <div class="progress-track">
+              <div id="progress-bar" class="progress-bar"></div>
+            </div>
+            <div id="status-text" class="status-text">Uploading image</div>
+            <div class="status-sub muted">Please keep this tab open.</div>
+          </div>
+        </div>
+
+        <div id="state-result" class="state state-result">
+          <div class="result-card">
+            <div class="result-media">
+              <img id="result-image" alt="Generated result">
+              <button id="zoom-btn" class="zoom-btn" type="button">Fullscreen</button>
+            </div>
+            <div class="result-actions">
+              <a id="download-btn" class="btn-secondary" href="#" download>Download</a>
+              <button id="regen-btn" class="btn-secondary" type="button">Re-Generate</button>
+            </div>
+            <div class="result-copy">Generate again with the same image at a lower credit cost.</div>
+            <div class="disclaimer">AI-generated results may require review for final delivery.</div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div id="lightbox" class="lightbox hidden" aria-hidden="true">
+      <div class="lightbox-inner">
+        <button id="lightbox-close" class="lightbox-close" type="button">Close</button>
+        <img id="lightbox-image" alt="Fullscreen preview">
+      </div>
+    </div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
 </html>

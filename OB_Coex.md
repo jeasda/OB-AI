@@ -330,3 +330,42 @@ Notes for Next Session
 - Known limitations: webhook signature formats verified only by static comparison; no integration test coverage
 - Safe next steps: run `npm run typecheck` and `npm test`
 - Warnings or guardrails: ensure RunPod webhook secret matches configured header format
+## 2026-01-16 22:23 Session Summary
+
+### Objective
+- Redesign the Qwen Image Edit service page with a minimal, premium three-column layout and updated UI states
+
+### Actions Performed
+- Files modified: `frontend/services/qwen-image-edit/index.html`, `frontend/services/qwen-image-edit/styles.css`, `frontend/services/qwen-image-edit/app.js`, `OB_Coex.md`
+- Logic added: lightweight state handling for showroom/processing/result, upload preview, fake progress, polling, and fullscreen viewer
+- Mocks or stubs introduced: none
+- Config updates: none
+
+### Commands Executed
+- `Get-Content -Path AGENTS.md`
+- `Get-ChildItem -Force frontend`
+- `Get-Content -Path frontend\index.html`
+- `Get-Content -Path frontend\app.js`
+- `rg -n "sidebar|nav|menu" -S frontend\style.css frontend\index.html`
+- `Get-ChildItem -Force frontend\services`
+- `Get-Content -Path frontend\services\qwen-image-edit\index.html`
+- `rg -n "sidebar" -S frontend src`
+- `Get-Content -Path frontend\services\qwen-image-edit\styles.css`
+- `Get-ChildItem -Force frontend\services\qwen-image-edit`
+- `Get-Content -Path frontend\services\qwen-image-edit\app.js`
+- `Get-Date -Format "yyyy-MM-dd HH:mm"`
+
+### Validation
+- What was verified: not run (no automated checks executed)
+- What passed (typecheck, tests, runtime): not run
+- What was NOT tested (if any): frontend runtime, integration with API endpoints
+
+### Runtime Status
+- Local or Production: local
+- Mock mode ON or OFF: not evaluated
+- Worker running or stopped: stopped
+
+### Notes for Next Session
+- Known limitations: frontend changes not exercised against live API responses
+- Safe next steps: run a local static server or `pnpm dev` and verify upload/polling flow
+- Warnings or guardrails: ensure `/api/queue/create` and `/api/queue/status/:id` are available in the deployed environment
