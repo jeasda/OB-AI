@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Qwen Image Edit | OB AI Studio</title>
+    <link rel="icon" type="image/png" href="/logo.png">
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div class="debug-banner">
+      <span>Qwen Image Edit UI v2 (DEBUG)</span>
+    </div>
+    <div class="app-shell">
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+          <div class="brand-mark">OB</div>
+          <div class="brand-text">
+            <div class="brand-title">OB AI Studio</div>
+            <div class="brand-subtitle">Services</div>
+          </div>
+        </div>
+        <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </button>
+        <nav class="sidebar-nav">
+          <a class="sidebar-item" href="/">
+            <span class="icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 10.5 12 4l8 6.5v8.5a1 1 0 0 1-1 1h-5.5v-6h-3v6H5a1 1 0 0 1-1-1z" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linejoin="round"/>
+              </svg>
+            </span>
+            <span class="label">Home</span>
+          </a>
+          <a class="sidebar-item active" href="/services/qwen-image-edit/">
+            <span class="icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4.5 6.5h15v11h-15z" stroke="currentColor" stroke-width="1.4" fill="none"/>
+                <path d="M7.5 14.5 11 11l3 3 2-2 2.5 2.5" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+            <span class="label">Qwen Image Edit</span>
+          </a>
+          <a class="sidebar-item" href="/admin">
+            <span class="icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M6 7h12M6 12h12M6 17h12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+              </svg>
+            </span>
+            <span class="label">Jobs</span>
+          </a>
+        </nav>
+        <div class="sidebar-footer">
+          <div class="sidebar-note">Production ready</div>
+        </div>
+      </aside>
+
+      <section class="control-panel">
+        <header class="panel-header">
+          <span class="eyebrow">Qwen Image Edit</span>
+          <h1>Precision edits with a single prompt.</h1>
+          <p class="muted">Upload an image, describe the change, and let the model deliver a clean result.</p>
+        </header>
+
+        <div id="upload-zone" class="panel-card upload-card" role="button" tabindex="0">
+          <div class="upload-content">
+            <div class="upload-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 4v10M8 8l4-4 4 4" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div>
+              <div class="upload-title">Drop image here</div>
+              <div class="upload-subtitle">PNG or JPG up to 10MB</div>
+            </div>
+          </div>
+          <input id="file-input" type="file" accept="image/png,image/jpeg" hidden>
+          <img id="upload-preview" class="upload-preview hidden" alt="Uploaded preview">
+          <div id="upload-meta" class="upload-meta hidden">
+            <span id="upload-name"></span>
+            <span id="upload-size"></span>
+          </div>
+        </div>
+
+        <div class="panel-card">
+          <label class="field-label" for="prompt-input">Prompt</label>
+          <textarea
+            id="prompt-input"
+            class="prompt-input"
+            rows="4"
+            placeholder="e.g. Replace the background with a matte charcoal studio wall">
+          </textarea>
+        </div>
+
+        <div class="panel-card">
+          <div class="card-head">
+            <span class="field-label">Presets</span>
+            <span class="muted">Optional</span>
+          </div>
+          <div id="preset-chips" class="chip-row">
+            <button class="chip" type="button" data-prompt="cinematic lighting">Cinematic</button>
+            <button class="chip" type="button" data-prompt="product shot, clean backdrop">Product</button>
+            <button class="chip" type="button" data-prompt="editorial look, soft contrast">Editorial</button>
+            <button class="chip" type="button" data-prompt="night city glow">Night Glow</button>
+            <button class="chip" type="button" data-prompt="warm film tones">Film Warmth</button>
+          </div>
+        </div>
+
+        <details class="panel-card advanced" id="advanced-options">
+          <summary>
+            <span>Advanced options</span>
+            <span class="muted">Ratio, detail, lighting</span>
+          </summary>
+          <div class="advanced-body">
+            <div class="field">
+              <label class="field-label" for="ratio-select">Aspect ratio</label>
+              <select id="ratio-select" class="select-input">
+                <option value="1:1" selected>1:1 Square</option>
+                <option value="4:5">4:5 Portrait</option>
+                <option value="3:4">3:4 Portrait</option>
+                <option value="16:9">16:9 Landscape</option>
+                <option value="9:16">9:16 Story</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="field-label" for="detail-strength">Detail strength</label>
+              <div class="range-row">
+                <input id="detail-strength" type="range" min="0" max="100" value="60">
+                <span id="detail-value" class="range-value">60</span>
+              </div>
+            </div>
+            <div class="field toggle-field">
+              <input id="preserve-lighting" type="checkbox" checked>
+              <label for="preserve-lighting">Preserve original lighting</label>
+            </div>
+          </div>
+        </details>
+
+        <div class="action-stack">
+          <button id="generate-btn" class="btn-primary" disabled>Generate</button>
+          <div id="inline-error" class="inline-error"></div>
+        </div>
+      </section>
+
+      <section class="output-panel" aria-live="polite">
+        <div id="state-showroom" class="state state-showroom is-active">
+          <div class="hero-card">
+            <div class="hero-visual">
+              <div class="hero-badge">Mock Result</div>
+              <div class="hero-gradient"></div>
+            </div>
+            <div class="hero-copy">
+              <h2>Studio-grade edits without the busy work.</h2>
+              <p class="muted">
+                Qwen Image Edit keeps edges clean and tones consistent, so your final assets look intentional
+                and brand-ready.
+              </p>
+            </div>
+          </div>
+
+          <div class="comparison-card">
+            <div class="comparison-header">
+              <h3>Before / After</h3>
+              <span class="muted">Subtle cleanup, sharp detail</span>
+            </div>
+            <div class="comparison-grid">
+              <div class="comparison-block">
+                <span>Before</span>
+                <div class="comparison-frame"></div>
+              </div>
+              <div class="comparison-block after">
+                <span>After</span>
+                <div class="comparison-frame"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="guide-card">
+            <div class="guide-step">
+              <span class="step-number">1</span>
+              <div>
+                <div class="step-title">Upload</div>
+                <div class="muted">Drag or click to add your source image.</div>
+              </div>
+            </div>
+            <div class="guide-step">
+              <span class="step-number">2</span>
+              <div>
+                <div class="step-title">Describe</div>
+                <div class="muted">Write a precise change or select a preset.</div>
+              </div>
+            </div>
+            <div class="guide-step">
+              <span class="step-number">3</span>
+              <div>
+                <div class="step-title">Generate</div>
+                <div class="muted">Receive a clean, controlled edit in seconds.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="state-processing" class="state state-processing">
+          <div class="processing-card">
+            <div class="processing-header">
+              <span class="muted">Processing</span>
+              <span id="progress-percent" class="progress-percent">0%</span>
+            </div>
+            <div class="progress-track">
+              <div id="progress-bar" class="progress-bar"></div>
+            </div>
+            <div id="status-text" class="status-text">Uploading image</div>
+            <div class="status-sub muted">Please keep this tab open.</div>
+          </div>
+        </div>
+
+        <div id="state-result" class="state state-result">
+          <div class="result-card">
+            <div class="result-media">
+              <img id="result-image" alt="Generated result">
+              <button id="zoom-btn" class="zoom-btn" type="button">Fullscreen</button>
+            </div>
+            <div class="result-actions">
+              <a id="download-btn" class="btn-secondary" href="#" download>Download</a>
+              <button id="regen-btn" class="btn-secondary" type="button">Re-Generate</button>
+            </div>
+            <div class="result-copy">Generate again with the same image at a lower credit cost.</div>
+            <div class="disclaimer">AI-generated results may require review for final delivery.</div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div id="lightbox" class="lightbox hidden" aria-hidden="true">
+      <div class="lightbox-inner">
+        <button id="lightbox-close" class="lightbox-close" type="button">Close</button>
+        <img id="lightbox-image" alt="Fullscreen preview">
+      </div>
+    </div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

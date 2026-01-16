@@ -30,6 +30,7 @@ npx wrangler deploy
 - Build: `npm run buildfrontend`
 - Output: `dist`
 - Route: `/services/qwen-image-edit`
+- Deploy note: ensure `dist/services/qwen-image-edit/index.html` is emitted by Vite build.
 
 ## 3) Test (Windows PowerShell)
 ### A) JSON request (recommended)

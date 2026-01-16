@@ -2,7 +2,7 @@
 import { resolve } from 'node:path'
 
 export default defineConfig({
-  root: resolve(__dirname, 'frontend'),
+  root: resolve(__dirname),
   publicDir: resolve(__dirname, 'frontend', 'public'),
   base: './',
   build: {
@@ -10,7 +10,7 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        qwen: resolve(__dirname, 'frontend', 'services', 'qwen-image-edit', 'index.html')
+        'services/qwen-image-edit/index': resolve(__dirname, 'services', 'qwen-image-edit', 'index.html')
       }
     }
   },

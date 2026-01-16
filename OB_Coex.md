@@ -406,3 +406,35 @@ Notes for Next Session
 - Known limitations: deployment not triggered from this environment
 - Safe next steps: run `npm run buildfrontend` and deploy via Cloudflare Pages
 - Warnings or guardrails: keep `dist/` uncommitted
+## 2026-01-16 22:38 Session Summary
+
+### Objective
+- Ensure Vite builds emit the Qwen Image Edit page at dist/services/qwen-image-edit/index.html and add a visible debug banner
+
+### Actions Performed
+- Files modified: `vite.config.js`, `frontend/services/qwen-image-edit/index.html`, `frontend/services/qwen-image-edit/styles.css`, `README.md`, `OB_Coex.md`
+- Files created: `services/qwen-image-edit/index.html`, `services/qwen-image-edit/styles.css`, `services/qwen-image-edit/app.js`
+- Logic added: none
+- Mocks or stubs introduced: none
+- Config updates: Vite root set to repo root with multi-page input targeting `services/qwen-image-edit/index.html`
+
+### Commands Executed
+- `Get-Content -Path vite.config.js`
+- `npm run buildfrontend`
+- `Test-Path dist\services\qwen-image-edit\index.html`
+- `Get-Date -Format "yyyy-MM-dd HH:mm"`
+
+### Validation
+- What was verified: Vite build output path
+- What passed (typecheck, tests, runtime): Vite build succeeded
+- What was NOT tested (if any): frontend runtime, API integration
+
+### Runtime Status
+- Local or Production: local
+- Mock mode ON or OFF: not evaluated
+- Worker running or stopped: stopped
+
+### Notes for Next Session
+- Known limitations: duplicate service page sources under `frontend/` and `services/`
+- Safe next steps: verify Cloudflare Pages deploy uses `npm run buildfrontend` and `dist`
+- Warnings or guardrails: keep `dist/` uncommitted
