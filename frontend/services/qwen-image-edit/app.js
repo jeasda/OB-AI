@@ -16,6 +16,7 @@ const STATUS_LABELS = {
 const API_BASE = 'https://ob-ai-api.your-domain'
 const API_CREATE = `${API_BASE}/qwen/image-edit`
 const API_STATUS = `${API_BASE}/jobs`
+const RATIO_VALUE = '9:16'
 
 const elements = {
   body: document.body,
@@ -28,11 +29,6 @@ const elements = {
   uploadName: document.getElementById('upload-name'),
   uploadSize: document.getElementById('upload-size'),
   promptInput: document.getElementById('prompt-input'),
-  presetChips: document.getElementById('preset-chips'),
-  ratioSelect: document.getElementById('ratio-select'),
-  detailStrength: document.getElementById('detail-strength'),
-  detailValue: document.getElementById('detail-value'),
-  preserveLighting: document.getElementById('preserve-lighting'),
   generateBtn: document.getElementById('generate-btn'),
   inlineError: document.getElementById('inline-error'),
   progressBar: document.getElementById('progress-bar'),
@@ -40,7 +36,6 @@ const elements = {
   statusText: document.getElementById('status-text'),
   resultImage: document.getElementById('result-image'),
   downloadBtn: document.getElementById('download-btn'),
-  regenBtn: document.getElementById('regen-btn'),
   zoomBtn: document.getElementById('zoom-btn'),
   lightbox: document.getElementById('lightbox'),
   lightboxImage: document.getElementById('lightbox-image'),
@@ -61,10 +56,7 @@ let machine = {
     resultUrl: '',
     error: '',
     progress: 0,
-    statusText: STATUS_LABELS.uploading,
-    reuse: false,
-    lastPrompt: '',
-    lastPresets: []
+    statusText: STATUS_LABELS.uploading
   }
 }
 
@@ -86,10 +78,7 @@ function reduceState(state, context, event) {
           resultUrl: '',
           error: '',
           progress: 0,
-          statusText: STATUS_LABELS.uploading,
-          reuse: event.reuse || false,
-          lastPrompt: event.prompt,
-          lastPresets: event.presets
+          statusText: STATUS_LABELS.uploading
         }
       }
     case 'JOB_ACCEPTED':
@@ -167,16 +156,8 @@ function render() {
 }
 
 function setControlsDisabled(disabled) {
-  const buttons = elements.presetChips.querySelectorAll('button')
-  buttons.forEach((button) => {
-    button.disabled = disabled
-  })
-
   elements.fileInput.disabled = disabled
   elements.promptInput.disabled = disabled
-  elements.ratioSelect.disabled = disabled
-  elements.detailStrength.disabled = disabled
-  elements.preserveLighting.disabled = disabled
   elements.generateBtn.disabled = disabled || !isFormReady()
 }
 
@@ -248,59 +229,22 @@ function updateGenerateState() {
   elements.generateBtn.disabled = !isFormReady() || busy
 }
 
-function handlePresetClick(event) {
-  const button = event.target.closest('button')
-  if (!button) return
-  const preset = button.dataset.prompt
-  if (!preset) return
-
-  const current = elements.promptInput.value.trim()
-  elements.promptInput.value = current ? `${current}, ${preset}` : preset
-  elements.promptInput.focus()
-
-  elements.presetChips.querySelectorAll('.chip').forEach((chip) => {
-    chip.classList.toggle('is-active', chip === button)
-  })
-
-  updateGenerateState()
-}
-
-function handleDetailChange() {
-  elements.detailValue.textContent = elements.detailStrength.value
-}
-
-function getActivePresets() {
-  return Array.from(elements.presetChips.querySelectorAll('.chip.is-active')).map((chip) => chip.dataset.prompt).filter(Boolean)
-}
-
-async function handleGenerate(options = {}) {
+async function handleGenerate() {
   if (!isFormReady()) {
     setInlineError('Add an image and a prompt to continue.')
     return
   }
 
-  const reuse = !!options.reuse
-  const prompt = elements.promptInput.value.trim()
-  const presets = getActivePresets()
-
-  transition({ type: 'SUBMIT', reuse, prompt, presets })
+  transition({ type: 'SUBMIT' })
 
   try {
     const formData = new FormData()
-    formData.append('prompt', prompt)
-    formData.append('ratio', elements.ratioSelect.value)
+    formData.append('prompt', elements.promptInput.value.trim())
+    formData.append('ratio', RATIO_VALUE)
     formData.append('model', 'qwen-image')
     formData.append('service', 'qwen-image-edit')
     formData.append('image', selectedFile)
-    formData.append('presets', JSON.stringify(presets))
-    formData.append('reuse', reuse ? 'true' : 'false')
-    formData.append(
-      'options',
-      JSON.stringify({
-        detailStrength: Number(elements.detailStrength.value),
-        preserveLighting: elements.preserveLighting.checked
-      })
-    )
+    formData.append('options', JSON.stringify({}))
 
     const data = await createJobRequest(formData)
     if (!data?.jobId) {
@@ -333,10 +277,11 @@ async function checkStatus() {
     }
 
     const progress = typeof data?.progress === 'number' ? data.progress : machine.context.progress
+    const statusText = data?.message || mapStatusText(status, progress)
     transition({
       type: 'JOB_PROGRESS',
       progress,
-      statusText: mapStatusText(status, progress)
+      statusText
     })
   } catch (error) {
     stopPolling()
@@ -354,14 +299,6 @@ function mapStatusText(status, progress) {
   }
   if (status === 'finalizing') return STATUS_LABELS.finalizing
   return STATUS_LABELS.processing
-}
-
-function handleRegen() {
-  if (!selectedFile) {
-    setInlineError('Upload an image to generate again.')
-    return
-  }
-  handleGenerate({ reuse: true })
 }
 
 function openLightbox() {
@@ -430,13 +367,7 @@ elements.fileInput.addEventListener('change', (event) => {
 
 elements.promptInput.addEventListener('input', updateGenerateState)
 
-elements.presetChips.addEventListener('click', handlePresetClick)
-
-elements.detailStrength.addEventListener('input', handleDetailChange)
-
-elements.generateBtn.addEventListener('click', () => handleGenerate({ reuse: false }))
-
-elements.regenBtn.addEventListener('click', handleRegen)
+elements.generateBtn.addEventListener('click', handleGenerate)
 
 elements.zoomBtn.addEventListener('click', openLightbox)
 
@@ -448,6 +379,5 @@ elements.lightbox.addEventListener('click', (event) => {
   if (event.target === elements.lightbox) closeLightbox()
 })
 
-handleDetailChange()
 render()
 updateGenerateState()

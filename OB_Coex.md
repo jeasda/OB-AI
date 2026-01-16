@@ -593,3 +593,32 @@ Notes for Next Session
 - Known limitations: live endpoint base and R2 public URL not verified in this environment
 - Safe next steps: deploy and test with real Worker URL + R2 public domain
 - Warnings or guardrails: ensure `R2_PUBLIC_BASE` points to a public R2 domain
+## 2026-01-16 23:43 Session Summary
+
+### Objective
+- Adjust the Qwen Image Edit control panel to minimal inputs for Phase 1.1 verification and align frontend flow to required endpoints
+
+### Actions Performed
+- Files modified: `frontend/services/qwen-image-edit/index.html`, `services/qwen-image-edit/index.html`, `frontend/services/qwen-image-edit/app.js`, `services/qwen-image-edit/app.js`, `OB_Coex.md`
+- Logic added: simplified control panel flow and hardcoded ratio submission to 9:16
+- Mocks or stubs introduced: none
+- Config updates: none
+
+### Commands Executed
+- `Get-Date -Format "yyyy-MM-dd HH:mm"`
+- `start https://ob-ai.pages.dev/services/qwen-image-edit/`
+
+### Validation
+- What was verified: manual verification could not be completed in this environment
+- What passed (typecheck, tests, runtime): not run
+- What was NOT tested (if any): live UI upload, R2 output URL access, download flow
+
+### Runtime Status
+- Local or Production: local
+- Mock mode ON or OFF: not evaluated
+- Worker running or stopped: stopped
+
+### Notes for Next Session
+- Known limitations: manual browser verification requires interactive access
+- Safe next steps: complete live UI upload, confirm R2 URL opens and download matches preview
+- Warnings or guardrails: keep control panel limited to image + prompt + generate

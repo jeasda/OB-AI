@@ -88,53 +88,9 @@
             id="prompt-input"
             class="prompt-input"
             rows="4"
-            placeholder="e.g. Replace the background with a matte charcoal studio wall">
+            placeholder="e.g. Replace the background with a matte charcoal studio wall">change her outfit color to blue, editorial look, soft contrast
           </textarea>
         </div>
-
-        <div class="panel-card">
-          <div class="card-head">
-            <span class="field-label">Presets</span>
-            <span class="muted">Optional</span>
-          </div>
-          <div id="preset-chips" class="chip-row">
-            <button class="chip" type="button" data-prompt="cinematic lighting">Cinematic</button>
-            <button class="chip" type="button" data-prompt="product shot, clean backdrop">Product</button>
-            <button class="chip" type="button" data-prompt="editorial look, soft contrast">Editorial</button>
-            <button class="chip" type="button" data-prompt="night city glow">Night Glow</button>
-            <button class="chip" type="button" data-prompt="warm film tones">Film Warmth</button>
-          </div>
-        </div>
-
-        <details class="panel-card advanced" id="advanced-options">
-          <summary>
-            <span>Advanced options</span>
-            <span class="muted">Ratio, detail, lighting</span>
-          </summary>
-          <div class="advanced-body">
-            <div class="field">
-              <label class="field-label" for="ratio-select">Aspect ratio</label>
-              <select id="ratio-select" class="select-input">
-                <option value="1:1" selected>1:1 Square</option>
-                <option value="4:5">4:5 Portrait</option>
-                <option value="3:4">3:4 Portrait</option>
-                <option value="16:9">16:9 Landscape</option>
-                <option value="9:16">9:16 Story</option>
-              </select>
-            </div>
-            <div class="field">
-              <label class="field-label" for="detail-strength">Detail strength</label>
-              <div class="range-row">
-                <input id="detail-strength" type="range" min="0" max="100" value="60">
-                <span id="detail-value" class="range-value">60</span>
-              </div>
-            </div>
-            <div class="field toggle-field">
-              <input id="preserve-lighting" type="checkbox" checked>
-              <label for="preserve-lighting">Preserve original lighting</label>
-            </div>
-          </div>
-        </details>
 
         <div class="action-stack">
           <button id="generate-btn" class="btn-primary" disabled>Generate</button>
@@ -222,9 +178,7 @@
             </div>
             <div class="result-actions">
               <a id="download-btn" class="btn-secondary" href="#" download>Download</a>
-              <button id="regen-btn" class="btn-secondary" type="button">Re-Generate</button>
             </div>
-            <div class="result-copy">Generate again with the same image at a lower credit cost.</div>
             <div class="disclaimer">AI-generated results may require review for final delivery.</div>
           </div>
         </div>
