@@ -1102,3 +1102,26 @@ Notes for Next Session
 
 ### Notes for Next Session
 - Use /debug/submit-proxy-ping and submit proxy logs to confirm reachability and job submission
+## 2026-01-17 0341 Session Summary
+
+### Objective
+- Ensure submit proxy uses env RUNPOD_API_KEY and worker stops forwarding auth headers
+
+### Actions Performed
+- Files modified: src/routes/queue.ts, submit-proxy/src/index.ts, OB_Coex.md
+- Logic changes: removed RunPod auth headers from worker; submit proxy now uses env RUNPOD_API_KEY only
+- Config updates: none
+
+### Commands Executed
+- None
+
+### Validation
+- Not verified in this session
+
+### Runtime Status
+- Production
+- Mock mode OFF
+- Worker running
+
+### Notes for Next Session
+- Deploy worker and submit proxy, then verify NEW_JOB_SUBMITTED logs and RunPod job creation

@@ -57,8 +57,8 @@ function runpodBase(env: Env) {
   return (env.RUNPOD_API_BASE || 'https://api.runpod.ai/v2').replace(/\/$/, '')
 }
 
-async function submitToRunPod(env: Env, payload: Record<string, unknown>, apiKeyOverride?: string, requestId?: string) {
-  const apiKey = apiKeyOverride || env.RUNPOD_API_KEY
+async function submitToRunPod(env: Env, payload: Record<string, unknown>, requestId?: string) {
+  const apiKey = env.RUNPOD_API_KEY
   if (!apiKey) {
     emitLog('RUNPOD_SUBMIT_FAIL_NO_KEY', {
       requestId: requestId || 'unknown',
@@ -129,8 +129,8 @@ async function submitToRunPod(env: Env, payload: Record<string, unknown>, apiKey
   return jsonBody
 }
 
-async function getRunPodStatus(env: Env, runpodId: string, apiKeyOverride?: string) {
-  const apiKey = apiKeyOverride || env.RUNPOD_API_KEY
+async function getRunPodStatus(env: Env, runpodId: string) {
+  const apiKey = env.RUNPOD_API_KEY
   if (!apiKey) {
     throw new Error('RUNPOD_API_KEY is not set')
   }
@@ -220,30 +220,13 @@ export default {
           timestamp: new Date().toISOString(),
           requestId
         })
-        const authHeader = req.headers.get('authorization') || ''
-        const bearerKey = authHeader.toLowerCase().startsWith('bearer ')
-          ? authHeader.slice(7).trim()
-          : ''
-        const apiKey = bearerKey || req.headers.get('x-runpod-api-key') || undefined
-        emitLog('SUBMIT_PROXY_AUTH', {
-          timestamp: new Date().toISOString(),
-          requestId,
-          apiKeyLength: apiKey ? apiKey.length : 0
-        })
         lastJob = {
           requestId,
           timestamp: new Date().toISOString(),
           runpodJobId: null,
           runpodEndpointId: env.RUNPOD_ENDPOINT
         }
-        if (!apiKey && !env.RUNPOD_API_KEY) {
-          emitLog('RUNPOD_SUBMIT_FAIL_NO_KEY', {
-            requestId,
-            timestamp: new Date().toISOString()
-          })
-          return json({ error: 'RUNPOD_API_KEY is not set' }, 500)
-        }
-        const run = await submitToRunPod(env, payload as Record<string, unknown>, apiKey, requestId)
+        const run = await submitToRunPod(env, payload as Record<string, unknown>, requestId)
         return json({
           requestId,
           jobId: run?.id || run?.job_id,
@@ -254,12 +237,7 @@ export default {
       if (req.method === 'GET' && url.pathname.startsWith('/status/')) {
         const id = url.pathname.split('/').pop() || ''
         if (!id) return json({ error: 'missing runpod id' }, 400)
-        const authHeader = req.headers.get('authorization') || ''
-        const bearerKey = authHeader.toLowerCase().startsWith('bearer ')
-          ? authHeader.slice(7).trim()
-          : ''
-        const apiKey = bearerKey || req.headers.get('x-runpod-api-key') || undefined
-        const status = await getRunPodStatus(env, id, apiKey)
+        const status = await getRunPodStatus(env, id)
         return json({ status })
       }
 
