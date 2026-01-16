@@ -1054,3 +1054,51 @@ Runtime Status
 
 Notes for Next Session
 - Trigger Generate and confirm NEW_JOB_SUBMITTED logs with RunPod job ID
+2026-01-17 0327 Session Summary
+
+Objective
+- Add submit-proxy reachability debug route and harden submit proxy fetch handling in queue
+
+Actions Performed
+- Files modified: src/routes/queue.ts, src/index.ts, OB_Coex.md
+- Logic changes: added API_FORWARD_TO_SUBMIT_PROXY/SUBMIT_PROXY_RESPONSE/SUBMIT_PROXY_ERROR logs and detailed 502 responses; added /debug/submit-proxy-ping route
+- Config changes: none
+
+Commands Executed
+- 
+px wrangler deploy --env production
+- curl.exe -s "https://ob-ai-api.legacy-project.workers.dev/debug/submit-proxy-ping"
+
+Validation
+- Verified debug route responds with submit proxy health fetch result
+- Not tested: successful RunPod job creation
+
+Runtime Status
+- Production worker deployed
+- Submit proxy unchanged in this step
+
+Notes for Next Session
+- Investigate submit proxy 400 responses and lack of SUBMIT_PROXY_RECEIVED logs for worker requests
+## 2026-01-17 0328 Session Summary
+
+### Objective
+- Finalize worker-side submit proxy debug and logging for Phase 1.1 runtime verification
+
+### Actions Performed
+- Files modified: src/routes/queue.ts, src/index.ts, OB_Coex.md
+- Logic changes: retained submit proxy fetch logging and debug ping route in production
+- Config updates: none
+
+### Commands Executed
+- None
+
+### Validation
+- Not verified in this session
+
+### Runtime Status
+- Production
+- Mock mode OFF
+- Worker running
+
+### Notes for Next Session
+- Use /debug/submit-proxy-ping and submit proxy logs to confirm reachability and job submission

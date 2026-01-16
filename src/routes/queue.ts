@@ -160,28 +160,61 @@ export async function handleQueueCreate(req: Request, env: Env) {
         service: body.service || "qwen-image-edit",
       };
 
-      logEvent("info", "FORWARDING_TO_SUBMIT_PROXY", {
+      logEvent("info", "API_FORWARD_TO_SUBMIT_PROXY", {
         requestId,
         trace_id: requestId,
-        endpoint: env.SUBMIT_PROXY_URL,
-        job_id: job.id,
-        env: env.ENVIRONMENT || "local",
+        url: `${env.SUBMIT_PROXY_URL.replace(/\/$/, "")}/submit`,
+        timestamp: new Date().toISOString(),
       });
-      const proxyRes = await fetch(`${env.SUBMIT_PROXY_URL.replace(/\/$/, "")}/submit`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: env.RUNPOD_API_KEY ? `Bearer ${env.RUNPOD_API_KEY}` : "",
-        },
-        body: JSON.stringify(input),
+      let proxyRes: Response;
+      let proxyText = "";
+      try {
+        proxyRes = await fetch(`${env.SUBMIT_PROXY_URL.replace(/\/$/, "")}/submit`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: env.RUNPOD_API_KEY ? `Bearer ${env.RUNPOD_API_KEY}` : "",
+          },
+          body: JSON.stringify(input),
+        });
+        proxyText = await proxyRes.text();
+      } catch (error: any) {
+        logEvent("error", "SUBMIT_PROXY_CALL_FAILED", {
+          requestId,
+          error: error?.message || "submit proxy call failed",
+          timestamp: new Date().toISOString(),
+        });
+        return errorResponse(
+          "SUBMIT_PROXY_CALL_FAILED",
+          requestId,
+          502,
+          { details: error?.message || "submit proxy call failed" }
+        );
+      }
+      logEvent("info", "SUBMIT_PROXY_RESPONSE", {
+        requestId,
+        status: proxyRes.status,
+        timestamp: new Date().toISOString(),
       });
-      const proxyText = await proxyRes.text();
       if (!proxyRes.ok) {
-        throw new Error(proxyText || "Submit proxy failed");
+        logEvent("error", "SUBMIT_PROXY_ERROR", {
+          requestId,
+          status: proxyRes.status,
+          body: proxyText,
+          timestamp: new Date().toISOString(),
+        });
+        return errorResponse(
+          "SUBMIT_PROXY_CALL_FAILED",
+          requestId,
+          502,
+          { details: proxyText || `status ${proxyRes.status}` }
+        );
       }
       const proxyJson = JSON.parse(proxyText);
       const runpodId = proxyJson?.runpodRequestId || proxyJson?.jobId;
-      if (!runpodId) throw new Error("Submit proxy missing job id");
+      if (!runpodId) {
+        return errorResponse("SUBMIT_PROXY_CALL_FAILED", requestId, 502, { details: "missing job id" });
+      }
       await setRunPodId(env, job.id, runpodId);
       await updateJobTimestamp(env, job.id, { submitted_to_runpod_at_ms: Date.now() });
       logEvent("info", "queue.create.submitted", {
@@ -203,28 +236,61 @@ export async function handleQueueCreate(req: Request, env: Env) {
         ? { prompt: body.prompt }
         : { workflow: compileWorkflow({ prompt: body.prompt, ratio: body.ratio, seed: body.seed, steps: body.steps, cfg: body.cfg }) };
 
-    logEvent("info", "FORWARDING_TO_SUBMIT_PROXY", {
+    logEvent("info", "API_FORWARD_TO_SUBMIT_PROXY", {
       requestId,
       trace_id: requestId,
-      endpoint: env.SUBMIT_PROXY_URL,
-      job_id: job.id,
-      env: env.ENVIRONMENT || "local",
+      url: `${env.SUBMIT_PROXY_URL.replace(/\/$/, "")}/submit`,
+      timestamp: new Date().toISOString(),
     });
-    const proxyRes = await fetch(`${env.SUBMIT_PROXY_URL.replace(/\/$/, "")}/submit`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: env.RUNPOD_API_KEY ? `Bearer ${env.RUNPOD_API_KEY}` : "",
-      },
-      body: JSON.stringify(input),
+    let proxyRes: Response;
+    let proxyText = "";
+    try {
+      proxyRes = await fetch(`${env.SUBMIT_PROXY_URL.replace(/\/$/, "")}/submit`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: env.RUNPOD_API_KEY ? `Bearer ${env.RUNPOD_API_KEY}` : "",
+        },
+        body: JSON.stringify(input),
+      });
+      proxyText = await proxyRes.text();
+    } catch (error: any) {
+      logEvent("error", "SUBMIT_PROXY_CALL_FAILED", {
+        requestId,
+        error: error?.message || "submit proxy call failed",
+        timestamp: new Date().toISOString(),
+      });
+      return errorResponse(
+        "SUBMIT_PROXY_CALL_FAILED",
+        requestId,
+        502,
+        { details: error?.message || "submit proxy call failed" }
+      );
+    }
+    logEvent("info", "SUBMIT_PROXY_RESPONSE", {
+      requestId,
+      status: proxyRes.status,
+      timestamp: new Date().toISOString(),
     });
-    const proxyText = await proxyRes.text();
     if (!proxyRes.ok) {
-      throw new Error(proxyText || "Submit proxy failed");
+      logEvent("error", "SUBMIT_PROXY_ERROR", {
+        requestId,
+        status: proxyRes.status,
+        body: proxyText,
+        timestamp: new Date().toISOString(),
+      });
+      return errorResponse(
+        "SUBMIT_PROXY_CALL_FAILED",
+        requestId,
+        502,
+        { details: proxyText || `status ${proxyRes.status}` }
+      );
     }
     const proxyJson = JSON.parse(proxyText);
     const runpodId = proxyJson?.runpodRequestId || proxyJson?.jobId;
-    if (!runpodId) throw new Error("Submit proxy missing job id");
+    if (!runpodId) {
+      return errorResponse("SUBMIT_PROXY_CALL_FAILED", requestId, 502, { details: "missing job id" });
+    }
     await setRunPodId(env, job.id, runpodId);
     await updateJobTimestamp(env, job.id, { submitted_to_runpod_at_ms: Date.now() });
 
