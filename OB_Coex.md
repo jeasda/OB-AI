@@ -1194,3 +1194,26 @@ Notes for Next Session
 
 ### Notes for Next Session
 - Deploy submit proxy and verify missing key returns 503 with RUNPOD_API_KEY_MISSING
+## 2026-01-17 0444 Session Summary
+
+### Objective
+- Force submit proxy to submit a real workflow payload to RunPod
+
+### Actions Performed
+- Files modified: submit-proxy/src/index.ts, OB_Coex.md
+- Logic changes: submit proxy builds RunPod input from qwen_image_edit_base workflow and injects prompt/size defaults
+- Config updates: none
+
+### Commands Executed
+- None
+
+### Validation
+- Not verified in this session
+
+### Runtime Status
+- Production
+- Mock mode OFF
+- Worker running
+
+### Notes for Next Session
+- Deploy submit proxy and confirm NEW_JOB_SUBMITTED for workflow-based requests

@@ -1,3 +1,5 @@
+import { qwenImageEditBase } from '../../src/workflows/qwen_image_edit_base'
+
 type Env = {
   RUNPOD_API_KEY: string
   RUNPOD_ENDPOINT: string
@@ -73,7 +75,17 @@ async function submitToRunPod(env: Env, payload: Record<string, unknown>, reques
     throw new Error('RUNPOD_ENDPOINT is not set')
   }
   const url = `${runpodBase(env)}/${env.RUNPOD_ENDPOINT}/run`
-  const bodyText = JSON.stringify({ input: payload })
+  const workflow = JSON.parse(JSON.stringify(qwenImageEditBase))
+  const prompt = typeof (payload as any)?.prompt === 'string' ? String((payload as any).prompt) : ''
+  if (workflow?.['2']?.inputs) {
+    workflow['2'].inputs.prompt = prompt || workflow['2'].inputs.prompt || 'change her outfit color to blue, editorial look, soft contrast'
+    workflow['2'].inputs.negative_prompt = workflow['2'].inputs.negative_prompt || ''
+    workflow['2'].inputs.width = workflow['2'].inputs.width === '__WIDTH__' ? 1024 : workflow['2'].inputs.width
+    workflow['2'].inputs.height = workflow['2'].inputs.height === '__HEIGHT__' ? 1536 : workflow['2'].inputs.height
+    workflow['2'].inputs.steps = workflow['2'].inputs.steps === '__STEPS__' ? 20 : workflow['2'].inputs.steps
+    workflow['2'].inputs.cfg = workflow['2'].inputs.cfg === '__CFG__' ? 4.5 : workflow['2'].inputs.cfg
+  }
+  const bodyText = JSON.stringify({ input: { workflow } })
   emitLog('RUNPOD_SUBMIT_ATTEMPT', {
     requestId: requestId || 'unknown',
     endpoint: env.RUNPOD_ENDPOINT,
