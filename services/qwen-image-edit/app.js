@@ -1,7 +1,15 @@
 const States = {
-  showroom: 'showroom',
+  idle: 'idle',
   processing: 'processing',
-  result: 'result'
+  done: 'done',
+  error: 'error'
+}
+
+const STATUS_LABELS = {
+  uploading: 'Uploading image',
+  processing: 'Processing prompt',
+  generating: 'Generating result',
+  finalizing: 'Finalizing output'
 }
 
 const elements = {
@@ -37,35 +45,118 @@ const elements = {
   result: document.getElementById('state-result')
 }
 
-const STATUS_STEPS = [
-  { text: 'Uploading image', target: 28 },
-  { text: 'Processing prompt', target: 62 },
-  { text: 'Generating result', target: 88 },
-  { text: 'Finalizing output', target: 98 }
-]
+const API_CREATE = '/api/qwen-image-edit'
+const API_STATUS = '/api/job'
+const MOCK_API = true
+const mockJobs = new Map()
 
-let currentState = States.showroom
 let selectedFile = null
 let previewUrl = ''
-let jobId = null
-let progressTimer = null
 let pollTimer = null
-let progressValue = 0
-let statusIndex = 0
 
-const API_CREATE = '/api/queue/create'
-const API_STATUS = '/api/queue/status'
+let machine = {
+  state: States.idle,
+  context: {
+    jobId: null,
+    resultUrl: '',
+    error: '',
+    progress: 0,
+    statusText: STATUS_LABELS.uploading
+  }
+}
 
-function setState(nextState) {
-  currentState = nextState
-  elements.showroom.classList.toggle('is-active', nextState === States.showroom)
-  elements.processing.classList.toggle('is-active', nextState === States.processing)
-  elements.result.classList.toggle('is-active', nextState === States.result)
+function transition(event) {
+  machine = reduceState(machine.state, machine.context, event)
+  render()
+}
 
-  const isBusy = nextState === States.processing
-  elements.body.classList.toggle('is-busy', isBusy)
-  elements.body.setAttribute('aria-busy', String(isBusy))
-  setControlsDisabled(isBusy)
+function reduceState(state, context, event) {
+  const next = { ...context }
+
+  switch (event.type) {
+    case 'SUBMIT':
+      return {
+        state: States.processing,
+        context: {
+          ...next,
+          jobId: null,
+          resultUrl: '',
+          error: '',
+          progress: 0,
+          statusText: STATUS_LABELS.uploading
+        }
+      }
+    case 'JOB_ACCEPTED':
+      return {
+        state: state === States.processing ? state : States.processing,
+        context: {
+          ...next,
+          jobId: event.jobId
+        }
+      }
+    case 'JOB_PROGRESS':
+      return {
+        state: state === States.processing ? state : States.processing,
+        context: {
+          ...next,
+          progress: event.progress ?? next.progress,
+          statusText: event.statusText ?? next.statusText
+        }
+      }
+    case 'JOB_DONE':
+      return {
+        state: States.done,
+        context: {
+          ...next,
+          resultUrl: event.resultUrl,
+          progress: 100,
+          statusText: STATUS_LABELS.finalizing
+        }
+      }
+    case 'JOB_FAILED':
+      return {
+        state: States.error,
+        context: {
+          ...next,
+          error: event.error || 'Generation failed.',
+          progress: 0
+        }
+      }
+    case 'RESET':
+      return {
+        state: States.idle,
+        context: {
+          ...next,
+          error: ''
+        }
+      }
+    default:
+      return { state, context }
+  }
+}
+
+function render() {
+  const { state, context } = machine
+  const isProcessing = state === States.processing
+  const isDone = state === States.done
+
+  elements.showroom.classList.toggle('is-active', state === States.idle || state === States.error)
+  elements.processing.classList.toggle('is-active', isProcessing)
+  elements.result.classList.toggle('is-active', isDone)
+
+  elements.body.classList.toggle('is-busy', isProcessing)
+  elements.body.setAttribute('aria-busy', String(isProcessing))
+
+  setControlsDisabled(isProcessing)
+  setInlineError(state === States.error ? context.error : '')
+  setProgress(context.progress)
+  setStatus(context.statusText)
+
+  if (isDone && context.resultUrl) {
+    elements.resultImage.src = context.resultUrl
+    elements.downloadBtn.href = context.resultUrl
+    elements.lightboxImage.src = context.resultUrl
+  }
 }
 
 function setControlsDisabled(disabled) {
@@ -100,34 +191,9 @@ function setStatus(text) {
   elements.statusText.textContent = text
 }
 
-function startProgress() {
-  stopProgress()
-  progressValue = 0
-  statusIndex = 0
-  setProgress(0)
-  setStatus(STATUS_STEPS[0].text)
-
-  progressTimer = setInterval(() => {
-    const step = STATUS_STEPS[statusIndex]
-    const increment = step.target >= 90 ? 0.3 : 0.8
-    progressValue = Math.min(step.target, progressValue + increment)
-    setProgress(progressValue)
-
-    if (progressValue >= step.target && statusIndex < STATUS_STEPS.length - 1) {
-      statusIndex += 1
-      setStatus(STATUS_STEPS[statusIndex].text)
-    }
-  }, 180)
-}
-
-function stopProgress() {
-  if (progressTimer) clearInterval(progressTimer)
-  progressTimer = null
-}
-
 function startPolling() {
   stopPolling()
-  pollTimer = setInterval(checkStatus, 4000)
+  pollTimer = setInterval(checkStatus, 2000)
   checkStatus()
 }
 
@@ -171,7 +237,7 @@ function handleFile(file) {
 }
 
 function updateGenerateState() {
-  elements.generateBtn.disabled = !isFormReady()
+  elements.generateBtn.disabled = !isFormReady() || machine.state === States.processing
 }
 
 function handlePresetClick(event) {
@@ -201,9 +267,7 @@ async function handleGenerate() {
     return
   }
 
-  setInlineError('')
-  setState(States.processing)
-  startProgress()
+  transition({ type: 'SUBMIT' })
 
   try {
     const formData = new FormData()
@@ -220,71 +284,60 @@ async function handleGenerate() {
       })
     )
 
-    const response = await fetch(API_CREATE, {
-      method: 'POST',
-      body: formData
-    })
-
-    const data = await response.json()
-    if (!response.ok || !data.ok) {
+    const data = await createJobRequest(formData)
+    if (!data.ok) {
       throw new Error(data.error || 'Failed to start generation.')
     }
 
-    jobId = data.job_id || data.jobId || data.job?.id
-    if (!jobId) throw new Error('Job ID missing from response.')
+    const id = data.job_id || data.jobId || data.job?.id
+    if (!id) throw new Error('Job ID missing from response.')
 
+    transition({ type: 'JOB_ACCEPTED', jobId: id })
     startPolling()
   } catch (error) {
-    handleFailure(error.message || 'Generation failed.')
+    transition({ type: 'JOB_FAILED', error: error.message || 'Generation failed.' })
   }
 }
 
 async function checkStatus() {
-  if (!jobId) return
+  if (!machine.context.jobId) return
 
   try {
-    const response = await fetch(`${API_STATUS}/${jobId}`)
-    const data = await response.json()
-
-    if (!response.ok || !data.ok) {
-      if (data?.job?.status === 'failed') {
-        throw new Error('Generation failed on the server.')
-      }
-      return
+    const data = await getJobStatus(machine.context.jobId)
+    if (!data.ok) {
+      throw new Error(data.error || 'Failed to fetch job status.')
     }
 
-    const status = data?.job?.status
-    if (status === 'completed') {
-      const resultUrl = data.result_url || (data.job?.result_key ? `/api/result/${encodeURIComponent(data.job.result_key)}` : '')
+    const status = data.job?.status
+    if (status === 'done') {
+      const resultUrl = data.job?.result_url || previewUrl
       if (!resultUrl) throw new Error('Missing result URL.')
-      showResult(resultUrl)
+      stopPolling()
+      transition({ type: 'JOB_DONE', resultUrl })
       return
     }
 
-    if (status === 'failed') {
+    if (status === 'error') {
       throw new Error('Generation failed on the server.')
     }
+
+    transition({
+      type: 'JOB_PROGRESS',
+      progress: data.job?.progress ?? machine.context.progress,
+      statusText: mapStatusText(status)
+    })
   } catch (error) {
-    handleFailure(error.message || 'Generation failed.')
+    stopPolling()
+    transition({ type: 'JOB_FAILED', error: error.message || 'Generation failed.' })
   }
 }
 
-function showResult(url) {
-  stopPolling()
-  stopProgress()
-  setProgress(100)
-  elements.resultImage.src = url
-  elements.downloadBtn.href = url
-  elements.lightboxImage.src = url
-  setState(States.result)
-}
-
-function handleFailure(message) {
-  stopPolling()
-  stopProgress()
-  setProgress(0)
-  setState(States.showroom)
-  setInlineError(message)
+function mapStatusText(status) {
+  if (status === 'uploading') return STATUS_LABELS.uploading
+  if (status === 'processing') return STATUS_LABELS.processing
+  if (status === 'generating') return STATUS_LABELS.generating
+  if (status === 'finalizing') return STATUS_LABELS.finalizing
+  return STATUS_LABELS.processing
 }
 
 function handleRegen() {
@@ -307,15 +360,76 @@ function closeLightbox() {
   elements.lightbox.setAttribute('aria-hidden', 'true')
 }
 
+async function createJobRequest(formData) {
+  if (MOCK_API) {
+    return mockCreateJob(previewUrl)
+  }
+
+  const response = await fetch(API_CREATE, {
+    method: 'POST',
+    body: formData
+  })
+  const data = await response.json()
+  return response.ok ? data : { ok: false, error: data?.error || 'Request failed.' }
+}
+
+async function getJobStatus(id) {
+  if (MOCK_API) {
+    return mockGetJob(id)
+  }
+
+  const response = await fetch(`${API_STATUS}/${id}`)
+  const data = await response.json()
+  return response.ok ? data : { ok: false, error: data?.error || 'Status failed.' }
+}
+
+function mockCreateJob(resultUrl) {
+  const id = crypto.randomUUID()
+  mockJobs.set(id, {
+    id,
+    createdAt: Date.now(),
+    resultUrl
+  })
+  return Promise.resolve({ ok: true, job_id: id })
+}
+
+function mockGetJob(id) {
+  const job = mockJobs.get(id)
+  if (!job) {
+    return Promise.resolve({ ok: false, error: 'Job not found.' })
+  }
+
+  const elapsed = Date.now() - job.createdAt
+  const progress = Math.min(100, Math.floor(elapsed / 120))
+  let status = 'uploading'
+  if (progress >= 100) {
+    status = 'done'
+  } else if (progress >= 90) {
+    status = 'finalizing'
+  } else if (progress >= 60) {
+    status = 'generating'
+  } else if (progress >= 25) {
+    status = 'processing'
+  }
+
+  return Promise.resolve({
+    ok: true,
+    job: {
+      id,
+      status,
+      progress,
+      result_url: job.resultUrl
+    }
+  })
+}
+
 elements.sidebarToggle.addEventListener('click', () => {
   elements.sidebar.classList.toggle('is-expanded')
 })
 
 elements.uploadZone.addEventListener('click', handleUploadClick)
 
-if (elements.uploadZone) {
-  elements.uploadZone.addEventListener('keydown', handleUploadKey)
-}
+elements.uploadZone.addEventListener('keydown', handleUploadKey)
 
 elements.uploadZone.addEventListener('dragover', (event) => {
   event.preventDefault()
@@ -359,5 +473,5 @@ elements.lightbox.addEventListener('click', (event) => {
 })
 
 handleDetailChange()
-setState(States.showroom)
+render()
 updateGenerateState()

@@ -438,3 +438,32 @@ Notes for Next Session
 - Known limitations: duplicate service page sources under `frontend/` and `services/`
 - Safe next steps: verify Cloudflare Pages deploy uses `npm run buildfrontend` and `dist`
 - Warnings or guardrails: keep `dist/` uncommitted
+## 2026-01-16 22:48 Session Summary
+
+### Objective
+- Remove the debug banner and replace fake progress with an async-ready state machine plus stubbed API calls
+
+### Actions Performed
+- Files modified: `frontend/services/qwen-image-edit/index.html`, `frontend/services/qwen-image-edit/styles.css`, `frontend/services/qwen-image-edit/app.js`, `services/qwen-image-edit/index.html`, `services/qwen-image-edit/styles.css`, `services/qwen-image-edit/app.js`, `OB_Coex.md`
+- Logic added: state machine with idle/processing/done/error, stubbed POST `/api/qwen-image-edit` and GET `/api/job/:id`
+- Mocks or stubs introduced: in-memory mock job store with progress simulation
+- Config updates: none
+
+### Commands Executed
+- `Get-Content -Path services\qwen-image-edit\app.js`
+- `Get-Date -Format "yyyy-MM-dd HH:mm"`
+
+### Validation
+- What was verified: not run (no automated checks executed)
+- What passed (typecheck, tests, runtime): not run
+- What was NOT tested (if any): frontend runtime, API integration
+
+### Runtime Status
+- Local or Production: local
+- Mock mode ON or OFF: mock mode ON for frontend stubs
+- Worker running or stopped: stopped
+
+### Notes for Next Session
+- Known limitations: stub endpoints only; real API wiring pending
+- Safe next steps: hook `/api/qwen-image-edit` and `/api/job/:id` to backend
+- Warnings or guardrails: keep stubs aligned with backend response schema
