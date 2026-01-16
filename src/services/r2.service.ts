@@ -24,17 +24,24 @@ export async function putPngBase64(env: Env, base64Png: string, prefix = "result
   return key;
 }
 
+function toArrayBuffer(bytes: ArrayBuffer | Uint8Array) {
+  if (bytes instanceof Uint8Array) {
+    return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+  }
+  return bytes;
+}
+
 export async function putPngBytes(env: Env, bytes: ArrayBuffer | Uint8Array, prefix = "results") {
   const key = `${env.R2_PREFIX}/${prefix}/${crypto.randomUUID()}.png`;
   const startedAt = Date.now();
-  const body = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  const body = toArrayBuffer(bytes);
 
   await env.R2_RESULTS.put(key, body, {
     httpMetadata: { contentType: "image/png" },
   });
   logEvent("info", "r2.put", {
     key,
-    sizeBytes: body.length,
+    sizeBytes: body.byteLength,
     latencyMs: Date.now() - startedAt,
     payloadHash: hashString(key),
     env: env.ENVIRONMENT || "local",
@@ -45,14 +52,14 @@ export async function putPngBytes(env: Env, bytes: ArrayBuffer | Uint8Array, pre
 
 export async function putPngBytesWithKey(env: Env, key: string, bytes: ArrayBuffer | Uint8Array) {
   const startedAt = Date.now();
-  const body = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  const body = toArrayBuffer(bytes);
 
   await env.R2_RESULTS.put(key, body, {
     httpMetadata: { contentType: "image/png" },
   });
   logEvent("info", "r2.put", {
     key,
-    sizeBytes: body.length,
+    sizeBytes: body.byteLength,
     latencyMs: Date.now() - startedAt,
     payloadHash: hashString(key),
     env: env.ENVIRONMENT || "local",

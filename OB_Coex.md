@@ -709,3 +709,41 @@ Notes for Next Session
 - Known limitations: production endpoint behavior not validated from this environment
 - Safe next steps: verify /qwen/image-edit and /jobs/:id in production
 - Warnings or guardrails: ensure worker deploy includes qwen routes
+## 2026-01-17 00:52 Session Summary
+
+### Objective
+- Fix production Qwen Image Edit flow by deploying worker changes and ensuring output URLs resolve
+
+### Actions Performed
+- Files modified: wrangler.toml, src/services/qwen_jobs.service.ts, src/routes/qwen.image-edit.ts, src/routes/jobs.status.ts, src/services/r2.service.ts
+- Logic added/changed: persist Qwen job state in R2, verify image upload, normalize R2 upload body
+- Config updates: set production R2_PUBLIC_BASE to worker /api/result and R2 bucket binding to ob-ai-results
+
+### Commands Executed
+- 
+px wrangler deploy --env production
+- curl.exe -s -X POST "https://ob-ai-api.legacy-project.workers.dev/qwen/image-edit" -F "image=@C:\Anti_OB\runninghub-app\test.png" -F "prompt=change her outfit color to blue, editorial look, soft contrast"
+- curl.exe -s "https://ob-ai-api.legacy-project.workers.dev/jobs/763efaac-eb2f-497d-923d-2762830195e2"
+- curl.exe -I "https://ob-ai-results.r2.dev/qwen-image-edit/7cf3c732-9cb3-41c9-a9db-aba59a8e2ddd.png"
+- curl.exe -s -X POST "https://ob-ai-api.legacy-project.workers.dev/qwen/image-edit" -F "image=@C:\Anti_OB\runninghub-app\test.png" -F "prompt=change her outfit color to blue, editorial look, soft contrast"
+- curl.exe -s "https://ob-ai-api.legacy-project.workers.dev/jobs/00420ee0-8bff-448f-86b4-36161636a8cd"
+- curl.exe -I "https://ob-ai-api.legacy-project.workers.dev/api/result/qwen-image-edit/00420ee0-8bff-448f-86b4-36161636a8cd.png"
+- curl.exe -s -X POST "https://ob-ai-api.legacy-project.workers.dev/qwen/image-edit" -F "image=@C:\Anti_OB\runninghub-app\test.png" -F "prompt=change her outfit color to blue, editorial look, soft contrast"
+- curl.exe -s "https://ob-ai-api.legacy-project.workers.dev/jobs/e378b951-e1ea-40d3-aaf6-6e6c85bf6d44"
+- curl.exe -I "https://ob-ai-api.legacy-project.workers.dev/api/result/qwen-image-edit/e378b951-e1ea-40d3-aaf6-6e6c85bf6d44.png"
+- curl.exe -s -o NUL -w "%{http_code}" "https://ob-ai-api.legacy-project.workers.dev/api/result/qwen-image-edit/e378b951-e1ea-40d3-aaf6-6e6c85bf6d44.png"
+- curl.exe -s -D - -o NUL "https://ob-ai-api.legacy-project.workers.dev/api/result/qwen-image-edit/e378b951-e1ea-40d3-aaf6-6e6c85bf6d44.png"
+
+### Validation
+- Verified job creation and polling via worker endpoints
+- Verified output URL resolves via GET (200) and returns image/png
+- Not tested: browser UI end-to-end on Pages during this session
+
+### Runtime Status
+- Production worker deployed
+- Mock mode OFF (production validation enforced)
+- Worker running
+
+### Notes for Next Session
+- Ensure Pages UI points to the worker output URL and verify preview/download in browser
+- If R2 public domain is required later, replace /api/result base with actual R2 public domain

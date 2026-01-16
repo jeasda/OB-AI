@@ -90,7 +90,7 @@ async function parseRequest(request: Request): Promise<ParsedRequest> {
 
 async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
   const { image, prompt, presets, options } = payload;
-  updateQwenJob(jobId, { status: "processing", progress: 20 });
+  await updateQwenJob(env, jobId, { status: "processing", progress: 20 });
 
   const finalPrompt = buildQwenPrompt(
     "Apply clean, realistic edits while preserving identity and lighting.",
@@ -101,13 +101,17 @@ async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
 
   const output = await generateQwenImage({ image, prompt: finalPrompt });
 
-  updateQwenJob(jobId, { status: "uploading", progress: 90 });
+  await updateQwenJob(env, jobId, { status: "uploading", progress: 90 });
 
   const key = `qwen-image-edit/${jobId}.png`;
   await putPngBytesWithKey(env, key, output);
+  const verify = await env.R2_RESULTS.get(key);
+  if (!verify) {
+    throw new Error("R2 upload verification failed");
+  }
   const outputUrl = getPublicUrlForKey(env, key);
 
-  updateQwenJob(jobId, { status: "done", progress: 100, outputUrl });
+  await updateQwenJob(env, jobId, { status: "done", progress: 100, outputUrl });
   logEvent("info", "qwen.job.completed", { jobId, outputUrl });
 }
 
@@ -130,14 +134,14 @@ export async function handleQwenImageEdit(req: Request, env: Env, ctx: Execution
       return jsonResponse({ error: "prompt is required", requestId }, { status: 400, headers: corsHeaders() });
     }
 
-    const job = createQwenJob();
+    const job = await createQwenJob(env);
     ctx.waitUntil(
       processJob(env, job.jobId, payload).catch((error) => {
-        updateQwenJob(job.jobId, {
+        updateQwenJob(env, job.jobId, {
           status: "error",
           progress: 0,
           error: error?.message || "generation failed",
-        });
+        }).catch(() => {});
       })
     );
 

@@ -23,7 +23,7 @@ export async function handleJobStatus(req: Request, env: Env, jobId: string) {
     return new Response(null, { status: 204, headers: corsHeaders() });
   }
 
-  const job = getQwenJob(jobId);
+  const job = await getQwenJob(env, jobId);
   if (!job) {
     return jsonResponse({ status: "error", message: "job not found" }, { status: 404, headers: corsHeaders() });
   }
