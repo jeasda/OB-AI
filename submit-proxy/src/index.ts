@@ -105,6 +105,13 @@ async function submitToRunPod(env: Env, payload: Record<string, unknown>, apiKey
   const jsonBody = JSON.parse(raw)
   const runpodId = jsonBody?.id || jsonBody?.job_id
   if (!runpodId) {
+    emitLog('RUNPOD_RESPONSE_ERROR', {
+      requestId: requestId || 'unknown',
+      endpoint: env.RUNPOD_ENDPOINT,
+      status: res.status,
+      timestamp: new Date().toISOString(),
+      bodyPreview: raw.slice(0, 512)
+    })
     throw new Error('RunPod response missing job id')
   }
   emitLog('NEW_JOB_SUBMITTED', {
@@ -228,6 +235,13 @@ export default {
           timestamp: new Date().toISOString(),
           runpodJobId: null,
           runpodEndpointId: env.RUNPOD_ENDPOINT
+        }
+        if (!apiKey && !env.RUNPOD_API_KEY) {
+          emitLog('RUNPOD_SUBMIT_FAIL_NO_KEY', {
+            requestId,
+            timestamp: new Date().toISOString()
+          })
+          return json({ error: 'RUNPOD_API_KEY is not set' }, 500)
         }
         const run = await submitToRunPod(env, payload as Record<string, unknown>, apiKey, requestId)
         return json({

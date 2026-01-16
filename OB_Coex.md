@@ -1030,3 +1030,27 @@ Runtime Status
 
 Notes for Next Session
 - Trigger Generate and verify RunPod NEW_JOB_SUBMITTED logs and R2 output
+2026-01-17 0310 Session Summary
+
+Objective
+- Harden submit proxy RunPod submission to prevent false success and require real job IDs
+
+Actions Performed
+- Files modified: submit-proxy/src/index.ts, OB_Coex.md
+- Logic changes: enforce API key requirement, log RUNPOD_SUBMIT_FAIL_NO_KEY, validate runpodJobId, and emit response error logs with requestId
+- Config changes: none
+
+Commands Executed
+- 
+px wrangler deploy --config submit-proxy/wrangler.toml --env production
+
+Validation
+- Verified submit proxy deployed with stricter RunPod response validation
+- Not tested: live RunPod job creation and frontend loop
+
+Runtime Status
+- Production submit proxy deployed
+- Worker not redeployed in this step
+
+Notes for Next Session
+- Trigger Generate and confirm NEW_JOB_SUBMITTED logs with RunPod job ID
