@@ -46,10 +46,32 @@ function redactedHeaders(base: Record<string, string>) {
   return redactSecrets({ ...base }) as Record<string, string>;
 }
 
-export async function submitToRunPod(
-  env: Env,
-  payload: Record<string, any>
-) {
+const RUNPOD_TIMEOUT_MS = 60_000;
+const RUNPOD_RETRIES = 2;
+
+async function runpodFetch(url: string, init: RequestInit) {
+  let lastError: any = null;
+  for (let attempt = 1; attempt <= RUNPOD_RETRIES + 1; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort("timeout"), RUNPOD_TIMEOUT_MS);
+    try {
+      const res = await fetch(url, { ...init, signal: controller.signal });
+      clearTimeout(timeout);
+      return res;
+    } catch (error: any) {
+      clearTimeout(timeout);
+      lastError = error;
+      if (attempt <= RUNPOD_RETRIES) {
+        await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
+        continue;
+      }
+      break;
+    }
+  }
+  throw lastError || new Error("RunPod request failed");
+}
+
+export async function submitToRunPod(env: Env, payload: Record<string, any>) {
   assertNoMockInProduction(env);
 
   if (isMockMode(env)) {
@@ -82,7 +104,7 @@ export async function submitToRunPod(
   });
 
   const startedAt = Date.now();
-  const res = await fetch(url, {
+  const res = await runpodFetch(url, {
     method: "POST",
     headers,
     body: bodyText,
@@ -113,6 +135,10 @@ export async function submitToRunPod(
     throw new Error((json as any)?.error || "RunPod API error");
   }
 
+  const runpodId = (json as any)?.id || (json as any)?.job_id;
+  if (!runpodId) {
+    throw new Error("RunPod response missing job id");
+  }
   return json as any;
 }
 
@@ -144,7 +170,7 @@ export async function getRunPodStatus(env: Env, runpodId: string): Promise<any> 
   });
 
   const startedAt = Date.now();
-  const res = await fetch(url, {
+  const res = await runpodFetch(url, {
     method: "GET",
     headers,
   });

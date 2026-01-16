@@ -124,6 +124,12 @@ async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
   let lastError: any = null;
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
+      logEvent("info", "RUNPOD_SUBMIT_ATTEMPT", {
+        endpoint: env.RUNPOD_ENDPOINT,
+        payloadSize: JSON.stringify(runpodPayload).length,
+        timestamp: new Date().toISOString(),
+        attempt,
+      });
       run = await submitToRunPod(env, runpodPayload as any);
       break;
     } catch (error: any) {
@@ -139,6 +145,12 @@ async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
     }
   }
   if (!run) {
+    logEvent("error", "RUNPOD_SUBMIT_FAILED", {
+      errorMessage: lastError?.message || "runpod submit failed",
+      stack: lastError?.stack,
+      endpoint: env.RUNPOD_ENDPOINT,
+      timestamp: new Date().toISOString(),
+    });
     throw new Error(lastError?.message || "RunPod submit failed");
   }
   const runpodId = run?.id || run?.job_id || null;
@@ -154,7 +166,7 @@ async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
   logEvent("info", "NEW_JOB_SUBMITTED", {
     jobId,
     runpod_request_id: runpodId,
-    submitted_at_ms: Date.now(),
+    timestamp: new Date().toISOString(),
   });
 }
 

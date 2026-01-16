@@ -860,3 +860,32 @@ Runtime Status
 Notes for Next Session
 - Investigate RunPod connectivity/credentials in production (RUNPOD_API_KEY and endpoint reachability)
 - Confirm RunPod job creation is visible in RunPod logs with NEW_JOB_SUBMITTED
+2026-01-17 0135 Session Summary
+
+Objective
+- Harden RunPod submit with timeout/retry and add mandated submission logging
+
+Actions Performed
+- Files modified: src/services/runpod.service.ts, src/routes/qwen.image-edit.ts, wrangler.toml, OB_Coex.md
+- Logic changes: added 60s timeout + retry for RunPod fetch, fail fast when job id missing, emit RUNPOD_SUBMIT_ATTEMPT/RUNPOD_SUBMIT_FAILED/NEW_JOB_SUBMITTED logs
+- Config changes: set production vars for RUNPOD_ENDPOINT, ENVIRONMENT, R2_PREFIX, R2_PUBLIC_BASE
+
+Commands Executed
+- 
+px wrangler deploy --env production
+- curl.exe -s -X POST "https://ob-ai-api.legacy-project.workers.dev/qwen/image-edit" -F "image=@C:\Anti_OB\runninghub-app\test.png" -F "prompt=change her outfit color to blue, editorial look, soft contrast"
+- curl.exe -s -X POST "https://ob-ai-api.legacy-project.workers.dev/qwen/image-edit" -F "image=@C:\Anti_OB\runninghub-app\debug_output.png" -F "prompt=change her outfit color to blue, editorial look, soft contrast"
+
+Validation
+- Verified worker deploy completed
+- RunPod submit still fails with "Network connection lost" from production endpoint
+- Not tested: live Pages UI preview/download
+
+Runtime Status
+- Production worker deployed
+- Mock mode OFF (production validation enforced)
+- Worker running
+
+Notes for Next Session
+- Investigate RunPod API reachability/endpoint validity from production worker
+- Capture logs for RUNPOD_SUBMIT_ATTEMPT and RUNPOD_SUBMIT_FAILED with timestamps
