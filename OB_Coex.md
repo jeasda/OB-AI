@@ -1376,6 +1376,30 @@ Notes for Next Session
 
 ### Notes for Next Session
 - Bind RUNPOD_API_KEY secret to ob-ai-submit-proxy and re-run submit test to reach NEW_JOB_SUBMITTED
+## 2026-01-17 0629 Session Summary
+
+### Objective
+- Expose /debug/env in production and verify R2 binding presence on ob-ai-api
+
+### Actions Performed
+- Files modified: OB_Coex.md
+- Logic changes: none
+- Config updates: none
+
+### Commands Executed
+- npx wrangler deploy --env production
+- curl.exe -s https://ob-ai-api.legacy-project.workers.dev/debug/env
+
+### Validation
+- /debug/env output: {"ok":true,"request_id":"9bf164c3dd6545b3","hasR2":true,"r2Type":"object","envKeys":["ENVIRONMENT","R2_PREFIX","R2_PUBLIC_BASE","R2_RESULTS","RESULTS_BUCKET","RUNPOD_API_KEY","RUNPOD_ENDPOINT","SUBMIT_PROXY_URL"]}
+
+### Runtime Status
+- Production
+- Mock mode OFF
+- Worker running
+
+### Notes for Next Session
+- Run UI Generate and verify submit-proxy logs and RunPod NEW_JOB_SUBMITTED once RUNPOD_API_KEY is set on submit-proxy
 ## 2026-01-17 0458 Session Summary
 
 ### Objective
