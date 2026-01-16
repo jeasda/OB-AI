@@ -120,7 +120,27 @@ async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
     service: "qwen-image-edit",
   };
 
-  const run = await submitToRunPod(env, runpodPayload as any);
+  let run: any = null;
+  let lastError: any = null;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      run = await submitToRunPod(env, runpodPayload as any);
+      break;
+    } catch (error: any) {
+      lastError = error;
+      logEvent("error", "qwen.runpod.submit_failed", {
+        jobId,
+        attempt,
+        error: error?.message || "runpod submit failed",
+      });
+      if (attempt < 3) {
+        await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
+      }
+    }
+  }
+  if (!run) {
+    throw new Error(lastError?.message || "RunPod submit failed");
+  }
   const runpodId = run?.id || run?.job_id || null;
   if (!runpodId) {
     throw new Error("RunPod did not return a job id");
@@ -159,17 +179,20 @@ export async function handleQwenImageEdit(req: Request, env: Env, ctx: Execution
 
     const job = await createQwenJob(env);
     logEvent("info", "qwen.job.created", { jobId: job.jobId, created_at_ms: Date.now() });
-    ctx.waitUntil(
-      processJob(env, job.jobId, payload).catch((error) => {
-        updateQwenJob(env, job.jobId, {
-          status: "error",
-          progress: 0,
-          error: error?.message || "generation failed",
-        }).catch(() => {});
-      })
-    );
-
-    return jsonResponse({ jobId: job.jobId }, { status: 200, headers: corsHeaders() });
+    try {
+      await processJob(env, job.jobId, payload);
+      return jsonResponse({ jobId: job.jobId }, { status: 200, headers: corsHeaders() });
+    } catch (error: any) {
+      await updateQwenJob(env, job.jobId, {
+        status: "error",
+        progress: 0,
+        error: error?.message || "generation failed",
+      });
+      return jsonResponse(
+        { error: error?.message || "generation failed", requestId },
+        { status: 502, headers: corsHeaders() }
+      );
+    }
   } catch (error: any) {
     return jsonResponse(
       { error: error?.message || "invalid request", requestId },

@@ -831,3 +831,32 @@ Runtime Status
 Notes for Next Session
 - Confirm RunPod logs show NEW_JOB_SUBMITTED with current timestamp
 - Verify live UI preview/download uses returned outputUrl
+2026-01-17 0127 Session Summary
+
+Objective
+- Force production env for Qwen Image Edit and ensure RunPod submit is attempted with retries
+
+Actions Performed
+- Files modified: wrangler.toml, src/routes/qwen.image-edit.ts, OB_Coex.md
+- Logic changes: make RunPod submission synchronous with retry and error logging
+- Config changes: set production ENVIRONMENT and R2_PREFIX, set RUNPOD_ENDPOINT for production
+
+Commands Executed
+- 
+px wrangler deploy --env production
+- curl.exe -s -X POST "https://ob-ai-api.legacy-project.workers.dev/qwen/image-edit" -F "image=@C:\Anti_OB\runninghub-app\test.png" -F "prompt=change her outfit color to blue, editorial look, soft contrast"
+- curl.exe -s -X POST "https://ob-ai-api.legacy-project.workers.dev/api/queue/create" -H "Content-Type: application/json" -d {\"prompt\":\"test\",\"ratio\":\"9:16\",\"model\":\"qwen-image\"}
+
+Validation
+- Verified worker deploy completed
+- Observed RunPod submit failure with "Network connection lost" from production endpoint
+- Not tested: live Pages UI end-to-end preview/download
+
+Runtime Status
+- Production worker deployed
+- Mock mode OFF (production validation enforced)
+- Worker running
+
+Notes for Next Session
+- Investigate RunPod connectivity/credentials in production (RUNPOD_API_KEY and endpoint reachability)
+- Confirm RunPod job creation is visible in RunPod logs with NEW_JOB_SUBMITTED
