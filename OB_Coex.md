@@ -266,3 +266,29 @@ Runtime Status
 
 Notes for Next Session
 - Redeploy Cloudflare Pages with root frontend/services/qwen-image-edit and build command npm install && npm run build
+
+## 2026-01-16 21:59 Session Summary
+
+### Objective
+- Prevent duplicate RunPod webhook processing for terminal jobs
+
+### Actions Performed
+- Files created / modified: `src/routes/runpod.webhook.ts`
+- Logic added / changed: ignore webhook events once a job is completed or failed, return existing result URL when available
+- Mocks or stubs introduced: none
+- Config updates: none
+
+### Commands Executed
+- Get-Date -Format 'yyyy-MM-dd HH:mm'
+
+### Validation
+- Not run (logic change only)
+
+### Runtime Status
+- Local
+- Mock mode not verified
+- Worker not running
+
+### Notes for Next Session
+- Verify webhook idempotency against staging payloads
+- Run typecheck after larger changes if more edits are made

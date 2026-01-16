@@ -156,6 +156,25 @@ export async function handleRunpodWebhook(req: Request, env: Env) {
     return okResponse({ job: { ...job, status: job.status } }, requestId);
   }
 
+  if (currentStatus === "completed" || currentStatus === "failed") {
+    logEvent("info", "runpod.webhook.terminal_ignored", {
+      requestId,
+      trace_id: requestId,
+      job_id: job.id,
+      runpod_id: runpodId,
+      current_status: currentStatus,
+      incoming_status: statusMapped,
+      reason: "terminal_status",
+      env: env.ENVIRONMENT || "local",
+    });
+    await markWebhookProcessed(env, eventId, "ignored");
+    const response: Record<string, unknown> = { job: { ...job, status: job.status } };
+    if (currentStatus === "completed" && job.result_key) {
+      response.result_url = await getPublicUrl(req, job.result_key);
+    }
+    return okResponse(response, requestId);
+  }
+
   if (statusMapped === "running") {
     await env.DB.prepare("UPDATE jobs SET status = 'running' WHERE id = ?").bind(job.id).run();
     await updateJobTimestamp(env, job.id, {
