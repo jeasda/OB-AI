@@ -1006,3 +1006,27 @@ Runtime Status
 
 Notes for Next Session
 - Use submit proxy logs to pinpoint 400 cause and confirm API key forwarding
+2026-01-17 0255 Session Summary
+
+Objective
+- Fix submit proxy API key resolution and audit logging for Phase 1.1 RunPod submission
+
+Actions Performed
+- Files modified: submit-proxy/src/index.ts, OB_Coex.md
+- Logic changes: pass request API key into submitToRunPod, log RUNPOD_SUBMIT_FAIL_NO_KEY with requestId and timestamp, include requestId in submit logs
+- Config changes: none
+
+Commands Executed
+- 
+px wrangler deploy --config submit-proxy/wrangler.toml --env production
+
+Validation
+- Verified submit proxy deployed with updated key resolution
+- Not tested: live RunPod job submission and UI loop
+
+Runtime Status
+- Production submit proxy deployed
+- Worker running (not redeployed in this step)
+
+Notes for Next Session
+- Trigger Generate and verify RunPod NEW_JOB_SUBMITTED logs and R2 output

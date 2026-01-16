@@ -57,9 +57,13 @@ function runpodBase(env: Env) {
   return (env.RUNPOD_API_BASE || 'https://api.runpod.ai/v2').replace(/\/$/, '')
 }
 
-async function submitToRunPod(env: Env, payload: Record<string, unknown>, apiKeyOverride?: string) {
+async function submitToRunPod(env: Env, payload: Record<string, unknown>, apiKeyOverride?: string, requestId?: string) {
   const apiKey = apiKeyOverride || env.RUNPOD_API_KEY
   if (!apiKey) {
+    emitLog('RUNPOD_SUBMIT_FAIL_NO_KEY', {
+      requestId: requestId || 'unknown',
+      timestamp: new Date().toISOString()
+    })
     throw new Error('RUNPOD_API_KEY is not set')
   }
   if (!env.RUNPOD_ENDPOINT) {
@@ -68,6 +72,7 @@ async function submitToRunPod(env: Env, payload: Record<string, unknown>, apiKey
   const url = `${runpodBase(env)}/${env.RUNPOD_ENDPOINT}/run`
   const bodyText = JSON.stringify({ input: payload })
   emitLog('RUNPOD_SUBMIT_ATTEMPT', {
+    requestId: requestId || 'unknown',
     endpoint: env.RUNPOD_ENDPOINT,
     payloadSize: bodyText.length,
     timestamp: new Date().toISOString()
@@ -92,6 +97,7 @@ async function submitToRunPod(env: Env, payload: Record<string, unknown>, apiKey
     throw new Error(raw || 'RunPod API error')
   }
   emitLog('RUNPOD_RESPONSE_OK', {
+    requestId: requestId || 'unknown',
     endpoint: env.RUNPOD_ENDPOINT,
     status: res.status,
     timestamp: new Date().toISOString()
@@ -102,7 +108,7 @@ async function submitToRunPod(env: Env, payload: Record<string, unknown>, apiKey
     throw new Error('RunPod response missing job id')
   }
   emitLog('NEW_JOB_SUBMITTED', {
-    requestId: lastJob?.requestId || 'unknown',
+    requestId: requestId || 'unknown',
     runpodJobId: runpodId,
     runpodEndpointId: env.RUNPOD_ENDPOINT,
     timestamp: new Date().toISOString()
@@ -223,7 +229,7 @@ export default {
           runpodJobId: null,
           runpodEndpointId: env.RUNPOD_ENDPOINT
         }
-        const run = await submitToRunPod(env, payload as Record<string, unknown>, apiKey)
+        const run = await submitToRunPod(env, payload as Record<string, unknown>, apiKey, requestId)
         return json({
           requestId,
           jobId: run?.id || run?.job_id,
