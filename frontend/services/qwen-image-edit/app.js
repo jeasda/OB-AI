@@ -13,7 +13,7 @@ const STATUS_LABELS = {
   finalizing: 'Finalizing output'
 }
 
-const API_BASE = 'https://ob-ai-api.your-domain'
+const API_BASE = 'https://ob-ai-api.legacy-project.workers.dev'
 const API_CREATE = `${API_BASE}/qwen/image-edit`
 const API_STATUS = `${API_BASE}/jobs`
 const RATIO_VALUE = '9:16'

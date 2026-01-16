@@ -680,3 +680,32 @@ Notes for Next Session
 - Known limitations: Pages deployment still required to publish dist
 - Safe next steps: deploy Pages and confirm UI at the production URL
 - Warnings or guardrails: do not change Pages config; keep dist path as emitted
+## 2026-01-17 00:21 Session Summary
+
+### Objective
+- Point Phase 1.1 frontend to the real Worker API base and rebuild dist output
+
+### Actions Performed
+- Files modified: `frontend/services/qwen-image-edit/app.js`, `OB_Coex.md`
+- Logic added / changed: API base updated to production worker domain
+- Mocks or stubs introduced: none
+- Config updates: none
+
+### Commands Executed
+- `npm run buildfrontend`
+- `Get-Date -Format "yyyy-MM-dd HH:mm"`
+
+### Validation
+- What was verified: dist build completed
+- What passed (typecheck, tests, runtime): Vite build succeeded
+- What was NOT tested (if any): live API calls, R2 URL access
+
+### Runtime Status
+- Local or Production: local
+- Mock mode ON or OFF: not evaluated
+- Worker running or stopped: stopped
+
+### Notes for Next Session
+- Known limitations: production endpoint behavior not validated from this environment
+- Safe next steps: verify /qwen/image-edit and /jobs/:id in production
+- Warnings or guardrails: ensure worker deploy includes qwen routes
