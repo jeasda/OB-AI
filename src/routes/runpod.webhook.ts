@@ -19,10 +19,24 @@ function isAuthorized(request: Request, env: Env) {
   return header === secret;
 }
 
+function constantTimeEqual(a: string, b: string) {
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i += 1) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+}
+
 async function verifySignature(rawBody: string, env: Env, signature: string | null) {
   if (!signature) return false;
   const secret = env.RUNPOD_WEBHOOK_SECRET;
   if (!secret) return false;
+  const normalized = signature.trim();
+  const normalizedNoPrefix = normalized.toLowerCase().startsWith("sha256=")
+    ? normalized.slice("sha256=".length)
+    : normalized;
+  const normalizedLower = normalizedNoPrefix.toLowerCase();
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
     "raw",
@@ -32,8 +46,16 @@ async function verifySignature(rawBody: string, env: Env, signature: string | nu
     ["sign"]
   );
   const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(rawBody));
-  const hex = Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
-  return hex === signature;
+  const bytes = new Uint8Array(sig);
+  const hex = Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+  const binary = String.fromCharCode(...bytes);
+  const base64 = btoa(binary);
+  const base64Url = base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return (
+    constantTimeEqual(hex, normalizedLower) ||
+    constantTimeEqual(base64, normalizedNoPrefix) ||
+    constantTimeEqual(base64Url, normalizedNoPrefix)
+  );
 }
 
 function mapStatus(status: string) {

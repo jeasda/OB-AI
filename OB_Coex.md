@@ -292,3 +292,41 @@ Notes for Next Session
 ### Notes for Next Session
 - Verify webhook idempotency against staging payloads
 - Run typecheck after larger changes if more edits are made
+## 2026-01-16 22:15 Session Summary
+
+### Objective
+- Harden RunPod webhook signature verification and document accepted signature formats
+
+### Actions Performed
+- Files modified: `src/routes/runpod.webhook.ts`, `docs/RUNPOD_WEBHOOKS.md`
+- Logic added: constant-time signature comparison and support for hex/base64/base64url with optional `sha256=` prefix
+- Mocks or stubs introduced: none
+- Config updates: none
+
+### Commands Executed
+- `Get-ChildItem -Force`
+- `rg -n "TODO|FIXME|HACK|BUG" -S`
+- `Get-Content -Path docs\STABILIZE_PHASE2_CHECKLIST.md`
+- `Get-Content -Path src\routes\runpod.webhook.ts`
+- `Get-Content -Path src\services\webhook_events.service.ts`
+- `Get-Content -Path src\services\r2.service.ts`
+- `Get-Content -Path src\routes\queue.ts`
+- `Get-Content -Path src\services\runpod.service.ts`
+- `Get-Content -Path docs\RUNPOD_WEBHOOKS.md`
+- `rg -n "x-runpod-signature" docs\RUNPOD_WEBHOOKS.md`
+- `Get-Date -Format "yyyy-MM-dd HH:mm"`
+
+### Validation
+- What was verified: not run (no automated checks executed)
+- What passed (typecheck, tests, runtime): not run
+- What was NOT tested (if any): typecheck, tests, runtime
+
+### Runtime Status
+- Local or Production: local
+- Mock mode ON or OFF: not evaluated
+- Worker running or stopped: stopped
+
+### Notes for Next Session
+- Known limitations: webhook signature formats verified only by static comparison; no integration test coverage
+- Safe next steps: run `npm run typecheck` and `npm test`
+- Warnings or guardrails: ensure RunPod webhook secret matches configured header format

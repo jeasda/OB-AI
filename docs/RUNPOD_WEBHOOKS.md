@@ -9,7 +9,7 @@
   - `x-runpod-webhook-secret: <secret>`
   - (fallback) `x-webhook-secret: <secret>`
 - Configure webhook URL + secret ใน RunPod endpoint settings
-- (optional) HMAC header: `x-runpod-signature` (HMAC SHA256 ของ raw body)
+- (optional) HMAC header: `x-runpod-signature` (HMAC SHA256 of raw body; accepts hex, base64, or base64url, optional `sha256=` prefix)
 
 ## Enable/Disable
 - `RUNPOD_WEBHOOK_ENABLED=true` (default)
