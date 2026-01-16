@@ -1263,3 +1263,26 @@ Notes for Next Session
 
 ### Notes for Next Session
 - Deploy submit proxy and verify /health, /debug/env, and RunPod job creation without 502s
+## 2026-01-17 0458 Session Summary
+
+### Objective
+- Ensure submit proxy builds RunPod payload from fixed workflow template and validates inputs
+
+### Actions Performed
+- Files modified: submit-proxy/src/index.ts, OB_Coex.md
+- Logic changes: inject prompt/image/width/height into RunPod input payload and validate workflow template
+- Config updates: none
+
+### Commands Executed
+- None
+
+### Validation
+- Not verified in this session
+
+### Runtime Status
+- Production
+- Mock mode OFF
+- Worker running
+
+### Notes for Next Session
+- Deploy submit proxy and verify RunPod job creation with NEW_JOB_SUBMITTED logs

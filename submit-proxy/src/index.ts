@@ -90,6 +90,13 @@ async function submitToRunPod(env: Env, payload: Record<string, unknown>, reques
       status: 400
     }
   }
+  if (!workflow || typeof workflow !== 'object') {
+    return {
+      error: 'INVALID_WORKFLOW',
+      message: 'Submit Proxy workflow template is invalid',
+      status: 400
+    }
+  }
   const imageName = typeof images[0]?.name === 'string' ? String(images[0].name) : 'input.png'
   if (workflow?.['1']?.inputs) {
     workflow['1'].inputs.image = imageName
@@ -102,7 +109,17 @@ async function submitToRunPod(env: Env, payload: Record<string, unknown>, reques
     workflow['2'].inputs.steps = workflow['2'].inputs.steps === '__STEPS__' ? 20 : workflow['2'].inputs.steps
     workflow['2'].inputs.cfg = workflow['2'].inputs.cfg === '__CFG__' ? 4.5 : workflow['2'].inputs.cfg
   }
-  const bodyText = JSON.stringify({ input: { workflow, images } })
+  const width = Number(workflow?.['2']?.inputs?.width) || 1024
+  const height = Number(workflow?.['2']?.inputs?.height) || 1536
+  const bodyText = JSON.stringify({
+    input: {
+      workflow,
+      prompt,
+      image: images[0].image,
+      width,
+      height
+    }
+  })
   emitLog('RUNPOD_SUBMIT_ATTEMPT', {
     requestId: requestId || 'unknown',
     endpoint: env.RUNPOD_ENDPOINT,
