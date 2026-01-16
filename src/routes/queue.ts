@@ -202,12 +202,12 @@ export async function handleQueueCreate(req: Request, env: Env) {
           body: proxyText,
           timestamp: new Date().toISOString(),
         });
-        return errorResponse(
-          "SUBMIT_PROXY_CALL_FAILED",
-          requestId,
-          502,
-          { details: proxyText || `status ${proxyRes.status}` }
-        );
+        return new Response(proxyText || `status ${proxyRes.status}`, {
+          status: proxyRes.status || 502,
+          headers: {
+            "Content-Type": proxyRes.headers.get("Content-Type") || "application/json",
+          },
+        });
       }
       const proxyJson = JSON.parse(proxyText);
       const runpodId = proxyJson?.runpodRequestId || proxyJson?.jobId;
@@ -277,12 +277,12 @@ export async function handleQueueCreate(req: Request, env: Env) {
         body: proxyText,
         timestamp: new Date().toISOString(),
       });
-      return errorResponse(
-        "SUBMIT_PROXY_CALL_FAILED",
-        requestId,
-        502,
-        { details: proxyText || `status ${proxyRes.status}` }
-      );
+      return new Response(proxyText || `status ${proxyRes.status}`, {
+        status: proxyRes.status || 502,
+        headers: {
+          "Content-Type": proxyRes.headers.get("Content-Type") || "application/json",
+        },
+      });
     }
     const proxyJson = JSON.parse(proxyText);
     const runpodId = proxyJson?.runpodRequestId || proxyJson?.jobId;

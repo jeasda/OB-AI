@@ -60,11 +60,11 @@ function runpodBase(env: Env) {
 async function submitToRunPod(env: Env, payload: Record<string, unknown>, requestId?: string) {
   const apiKey = env.RUNPOD_API_KEY
   if (!apiKey) {
-    emitLog('RUNPOD_SUBMIT_FAIL_NO_KEY', {
+    emitLog('RUNPOD_SUBMIT_SKIPPED_NO_KEY', {
       requestId: requestId || 'unknown',
       timestamp: new Date().toISOString()
     })
-    throw new Error('RUNPOD_API_KEY is not set')
+    return { error: 'RUNPOD_API_KEY missing in submit-proxy runtime' }
   }
   if (!env.RUNPOD_ENDPOINT) {
     throw new Error('RUNPOD_ENDPOINT is not set')
@@ -132,7 +132,7 @@ async function submitToRunPod(env: Env, payload: Record<string, unknown>, reques
 async function getRunPodStatus(env: Env, runpodId: string) {
   const apiKey = env.RUNPOD_API_KEY
   if (!apiKey) {
-    throw new Error('RUNPOD_API_KEY is not set')
+    return { error: 'RUNPOD_API_KEY missing in submit-proxy runtime' }
   }
   if (!env.RUNPOD_ENDPOINT) {
     throw new Error('RUNPOD_ENDPOINT is not set')
@@ -175,7 +175,11 @@ export default {
 
     try {
       if (req.method === 'GET' && url.pathname === '/health') {
-        return json({ status: 'ok', timestamp: new Date().toISOString() })
+        return json({ ok: true, timestamp: new Date().toISOString() })
+      }
+
+      if (req.method === 'GET' && url.pathname === '/debug/env') {
+        return json({ hasRunpodKey: !!env.RUNPOD_API_KEY, timestamp: new Date().toISOString() })
       }
 
       if (req.method === 'GET' && url.pathname === '/debug/last-job') {
@@ -227,6 +231,9 @@ export default {
           runpodEndpointId: env.RUNPOD_ENDPOINT
         }
         const run = await submitToRunPod(env, payload as Record<string, unknown>, requestId)
+        if (run?.error) {
+          return json({ error: run.error }, 502)
+        }
         return json({
           requestId,
           jobId: run?.id || run?.job_id,
@@ -238,6 +245,9 @@ export default {
         const id = url.pathname.split('/').pop() || ''
         if (!id) return json({ error: 'missing runpod id' }, 400)
         const status = await getRunPodStatus(env, id)
+        if (status?.error) {
+          return json({ error: status.error }, 502)
+        }
         return json({ status })
       }
 

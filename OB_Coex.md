@@ -1125,3 +1125,26 @@ Notes for Next Session
 
 ### Notes for Next Session
 - Deploy worker and submit proxy, then verify NEW_JOB_SUBMITTED logs and RunPod job creation
+## 2026-01-17 0348 Session Summary
+
+### Objective
+- Prevent submit proxy crashes on missing RunPod API key and expose runtime diagnostics
+
+### Actions Performed
+- Files modified: submit-proxy/src/index.ts, src/routes/queue.ts, OB_Coex.md
+- Logic changes: submit proxy returns 502 with RUNPOD_API_KEY missing error and logs RUNPOD_SUBMIT_SKIPPED_NO_KEY; added /debug/env; worker forwards submit proxy error bodies
+- Config updates: none
+
+### Commands Executed
+- None
+
+### Validation
+- Not verified in this session
+
+### Runtime Status
+- Production
+- Mock mode OFF
+- Worker running
+
+### Notes for Next Session
+- Deploy submit proxy and worker, then check /health and /debug/env for RunPod key presence
