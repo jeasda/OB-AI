@@ -33,6 +33,24 @@ body {
   overflow-x: hidden;
 }
 
+.debug-banner {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: rgba(16, 185, 129, 0.18);
+  color: #b9f6d2;
+  border-bottom: 1px solid rgba(16, 185, 129, 0.35);
+  backdrop-filter: blur(6px);
+}
+
 body::before,
 body::after {
   content: '';

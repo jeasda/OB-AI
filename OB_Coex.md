@@ -369,3 +369,40 @@ Notes for Next Session
 - Known limitations: frontend changes not exercised against live API responses
 - Safe next steps: run a local static server or `pnpm dev` and verify upload/polling flow
 - Warnings or guardrails: ensure `/api/queue/create` and `/api/queue/status/:id` are available in the deployed environment
+## 2026-01-16 22:32 Session Summary
+
+### Objective
+- Verify frontend build path and ensure Qwen Image Edit page is included, with a visible debug badge for deployment confirmation
+
+### Actions Performed
+- Files modified: `frontend/services/qwen-image-edit/index.html`, `frontend/services/qwen-image-edit/styles.css`, `docs/PAGES_QWEN_SETTINGS.md`, `README.md`, `OB_Coex.md`
+- Logic added: none (UI-only debug banner)
+- Mocks or stubs introduced: none
+- Config updates: clarified Pages build root and output in `docs/PAGES_QWEN_SETTINGS.md`
+
+### Commands Executed
+- `rg -n "pages|cloudflare|wrangler|build|output|dist|frontend" -S package.json frontend/package.json frontend/vite.config.js frontend/services/qwen-image-edit/package.json wrangler.toml README.md`
+- `rg --files -g "*wrangler*" -g "*.toml" -g "vite.config.*" -g "package.json"`
+- `Get-Content -Path vite.config.js`
+- `Get-Content -Path README.md`
+- `rg -n "dist|frontend|vite build|Pages" -S .`
+- `Get-Content -Path docs\PAGES_BUILD.md`
+- `Get-Content -Path docs\PAGES_QWEN_SETTINGS.md`
+- `Get-Content -Path frontend\services\qwen-image-edit\vite.config.js`
+- `Get-ChildItem -Recurse -Force dist | Select-Object -First 200`
+- `Get-Date -Format "yyyy-MM-dd HH:mm"`
+
+### Validation
+- What was verified: inspected build config and existing dist output paths
+- What passed (typecheck, tests, runtime): not run
+- What was NOT tested (if any): frontend runtime, build command, deployment
+
+### Runtime Status
+- Local or Production: local
+- Mock mode ON or OFF: not evaluated
+- Worker running or stopped: stopped
+
+### Notes for Next Session
+- Known limitations: deployment not triggered from this environment
+- Safe next steps: run `npm run buildfrontend` and deploy via Cloudflare Pages
+- Warnings or guardrails: keep `dist/` uncommitted

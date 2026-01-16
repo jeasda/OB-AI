@@ -1,65 +1,63 @@
-# RunningHub App
+# OB AI API (RunningHub-style: prompt -> compiler -> ComfyUI workflow -> RunPod)
 
-A Next.js application integrated with Cloudflare Pages and ComfyUI for advanced AI image editing using the Qwen model.
+## 0) Requirements
+- Cloudflare Workers + Wrangler
+- RunPod Serverless endpoint (ComfyUI worker)
+- D1 + R2 bindings
+- Secret: `RUNPOD_API_KEY`
 
-## Features
+## 1) Configure
+1) Edit `wrangler.toml`
+- `RUNPOD_ENDPOINT_ID`
+- `database_id`
+- bucket/database names if you changed them
 
-- **AI Image Editing**: Seamless integration with ComfyUI workflows (Qwen Image Edit).
-- **Serverless Backend**: Built on Cloudflare Pages with Cloudflare Functions for API handling.
-- **Modern UI**: Styled with TailwindCSS.
-- **Proxy Tunneling**: Secure connection to GPU providers (RunPod) via Cloudflare Tunnels/Workers.
+2) Set secret:
+```bash
+npx wrangler secret put RUNPOD_API_KEY
+```
 
-## Prerequisites
+3) (Optional) choose how we call RunPod:
+- `RUNPOD_MODE="workflow"` (default): sends `{"input":{"workflow":{...}}}` (RunPod worker-comfyui)
+- `RUNPOD_MODE="prompt"`: sends `{"input":{"prompt":"..."}}` (simple endpoints)
 
-- **Node.js**: Version 20+ recommended.
-- **npm** (or pnpm/yarn).
-- **ComfyUI Instance**: A running ComfyUI instance (e.g., on RunPod) with the Qwen Image Edit nodes and models installed.
+## 2) Deploy
+```bash
+npx wrangler deploy
+```
 
-## Setup & Installation
+## Frontend (Cloudflare Pages)
+- Build: `npm run buildfrontend`
+- Output: `dist`
+- Route: `/services/qwen-image-edit`
 
-1.  **Install Dependencies**:
-    ```bash
-    npm install
-    # or
-    pnpm install
-    ```
+## 3) Test (Windows PowerShell)
+### A) JSON request (recommended)
+```powershell
+$body = @{
+  prompt = "cinematic portrait of a thai girl, soft light, 85mm, bokeh"
+  ratio  = "9:16"
+  seed   = 123
+  steps  = 20
+  cfg    = 7
+} | ConvertTo-Json
 
-2.  **Environment Configuration**:
-    Create a `.env.local` file for local development:
-    ```env
-    # Direct URL to ComfyUI (Local or Public)
-    COMFY_API_URL=http://127.0.0.1:8188
-    ```
-    
-    *For Cloudflare deployment, ensure `TUNNEL_URL` is set in your KV namespace or Environment Variables.*
+Invoke-RestMethod `
+  -Uri "https://YOUR-WORKER.workers.dev/api/queue/create" `
+  -Method POST `
+  -ContentType "application/json" `
+  -Body $body
+```
 
-3.  **Run Development Server**:
-    ```bash
-    npm run dev
-    ```
-    Open [http://localhost:3000](http://localhost:3000) to view the app.
+### B) Poll status
+```powershell
+Invoke-RestMethod `
+  -Uri "https://YOUR-WORKER.workers.dev/api/queue/status/JOB_ID" `
+  -Method GET
+```
 
-## Project Structure
+When status becomes `completed`, you will get `result_url` (served from R2 via the Worker).
 
-- `src/app`: Next.js App Router pages and API routes.
-- `functions/api`: Cloudflare Pages Functions (Proxy logic).
-- `scripts/`: Utility scripts for verifying backend state.
-    - `check_models.js`: Checks available checkpoints on a local ComfyUI.
-    - `verify_runpod_content.js`: Verifies Qwen-specific models on a remote RunPod instance.
-
-## Deployment on Cloudflare Pages
-
-This project is configured for Cloudflare Pages (`wrangler.toml`).
-
-1.  **Build**:
-    ```bash
-    npm run build
-    ```
-2.  **Deploy**:
-    ```bash
-    npx wrangler pages deploy .
-    ```
-
-## Development Guidelines
-
-See [AGENTS.md](./AGENTS.md) for detailed coding standards and workflow instructions.
+## 4) Notes
+- This repo includes a **small compiler**: `src/compiler/workflow.ts` that injects the prompt + ratio into a ComfyUI workflow template.
+- Replace `src/workflows/flux_txt2img.json` with your own workflow exported from ComfyUI when you want different pipelines.
