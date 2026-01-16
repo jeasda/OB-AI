@@ -889,3 +889,33 @@ Runtime Status
 Notes for Next Session
 - Investigate RunPod API reachability/endpoint validity from production worker
 - Capture logs for RUNPOD_SUBMIT_ATTEMPT and RUNPOD_SUBMIT_FAILED with timestamps
+2026-01-17 0157 Session Summary
+
+Objective
+- Introduce Submit Proxy service and route Qwen Image Edit submissions through it with required logging
+
+Actions Performed
+- Files modified: submit-proxy/src/index.ts, submit-proxy/wrangler.toml, wrangler.toml, src/routes/qwen.image-edit.ts, src/routes/jobs.status.ts, src/env.ts, env.d.ts, OB_Coex.md
+- Logic changes: submit proxy service for RunPod submit/status, worker forwards to proxy and logs FORWARD_TO_SUBMIT_PROXY/JOB_STATUS_POLL
+- Config changes: added SUBMIT_PROXY_URL and submit-proxy worker config
+
+Commands Executed
+- 
+px wrangler deploy --config submit-proxy/wrangler.toml --env production
+- 
+px wrangler deploy --env production
+- curl.exe -s -X POST "https://ob-ai-api.legacy-project.workers.dev/qwen/image-edit" -F "image=@C:\Anti_OB\runninghub-app\tiny.png" -F "prompt=change her outfit color to blue, editorial look, soft contrast"
+
+Validation
+- Verified submit proxy and main worker deployed
+- Submit proxy returns errors without RUNPOD_API_KEY; worker reports submit proxy failure status
+- Not tested: end-to-end RunPod job creation due to missing proxy credentials
+
+Runtime Status
+- Production workers deployed (ob-ai-api, ob-ai-submit-proxy)
+- Mock mode OFF (production validation enforced)
+- Worker running
+
+Notes for Next Session
+- Provide RUNPOD_API_KEY to submit proxy or confirm secure header forwarding works
+- Verify RunPod job creation logs with NEW_JOB_SUBMITTED and fresh timestamps

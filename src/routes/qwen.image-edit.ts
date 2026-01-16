@@ -2,9 +2,8 @@ import type { Env } from "../env";
 import { getRequestId, jsonResponse } from "../utils/http";
 import { createQwenJob, updateQwenJob } from "../services/qwen_jobs.service";
 import { getPublicUrlForKey, putPngBytesWithKey } from "../services/r2.service";
-import { submitToRunPod, getRunPodStatus, extractBase64Png, extractOutputImageUrl } from "../services/runpod.service";
-import { buildWorkflow } from "../services/workflow.builder";
 import { logEvent } from "../utils/log";
+import { buildWorkflow } from "../services/workflow.builder";
 
 type ParsedRequest = {
   image: Uint8Array;
@@ -125,12 +124,34 @@ async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
       logEvent("info", "RUNPOD_SUBMIT_ATTEMPT", {
-        endpoint: env.RUNPOD_ENDPOINT,
+        endpoint: env.SUBMIT_PROXY_URL,
         payloadSize: JSON.stringify(runpodPayload).length,
         timestamp: new Date().toISOString(),
         attempt,
       });
-      run = await submitToRunPod(env, runpodPayload as any);
+      if (!env.SUBMIT_PROXY_URL) {
+        throw new Error("SUBMIT_PROXY_URL is not set");
+      }
+      logEvent("info", "FORWARD_TO_SUBMIT_PROXY", {
+        endpoint: env.SUBMIT_PROXY_URL,
+        timestamp: new Date().toISOString(),
+        api_key_present: !!env.RUNPOD_API_KEY,
+      });
+      const proxyRes = await fetch(`${env.SUBMIT_PROXY_URL.replace(/\/$/, "")}/proxy/runpod/submit`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: env.RUNPOD_API_KEY ? `Bearer ${env.RUNPOD_API_KEY}` : "",
+        },
+        body: JSON.stringify(runpodPayload),
+      });
+      const proxyText = await proxyRes.text();
+      if (!proxyRes.ok) {
+        const detail = proxyText || `status ${proxyRes.status}`;
+        throw new Error(`Submit proxy failed: ${detail}`);
+      }
+      const proxyJson = JSON.parse(proxyText);
+      run = proxyJson?.runpod;
       break;
     } catch (error: any) {
       lastError = error;
@@ -148,7 +169,7 @@ async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
     logEvent("error", "RUNPOD_SUBMIT_FAILED", {
       errorMessage: lastError?.message || "runpod submit failed",
       stack: lastError?.stack,
-      endpoint: env.RUNPOD_ENDPOINT,
+      endpoint: env.SUBMIT_PROXY_URL,
       timestamp: new Date().toISOString(),
     });
     throw new Error(lastError?.message || "RunPod submit failed");

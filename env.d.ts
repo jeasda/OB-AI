@@ -13,6 +13,7 @@ interface CloudflareEnv {
     WORKER_IMAGE_TAG?: string;
     COST_PER_JOB_USD?: string;
     ENVIRONMENT?: string;
+    SUBMIT_PROXY_URL?: string;
 }
 
 declare global {

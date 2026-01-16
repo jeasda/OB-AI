@@ -10,7 +10,7 @@ bucket_name = "ob-ai-results"
 
 [env.production]
 name = "ob-ai-api"
-vars = { R2_PUBLIC_BASE = "https://ob-ai-api.legacy-project.workers.dev/api/result", ENVIRONMENT = "production", R2_PREFIX = "results", RUNPOD_ENDPOINT = "i3qcf6gz8v495h" }
+vars = { R2_PUBLIC_BASE = "https://ob-ai-api.legacy-project.workers.dev/api/result", ENVIRONMENT = "production", R2_PREFIX = "results", RUNPOD_ENDPOINT = "i3qcf6gz8v495h", SUBMIT_PROXY_URL = "https://ob-ai-submit-proxy.legacy-project.workers.dev" }
 
 [[env.production.r2_buckets]]
 binding = "R2_RESULTS"

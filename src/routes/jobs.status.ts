@@ -1,8 +1,8 @@
 import type { Env } from "../env";
 import { jsonResponse } from "../utils/http";
 import { getQwenJob, updateQwenJob } from "../services/qwen_jobs.service";
-import { extractBase64Png, extractOutputImageUrl, getRunPodStatus } from "../services/runpod.service";
 import { getPublicUrlForKey, putPngBytesWithKey } from "../services/r2.service";
+import { logEvent } from "../utils/log";
 
 function corsHeaders() {
   return {
@@ -40,13 +40,44 @@ export async function handleJobStatus(req: Request, env: Env, jobId: string) {
 
   if (job.runpodId) {
     try {
-      const run = await getRunPodStatus(env, job.runpodId);
+      if (!env.SUBMIT_PROXY_URL) {
+        throw new Error("SUBMIT_PROXY_URL is not set");
+      }
+      logEvent("info", "JOB_STATUS_POLL", {
+        jobId,
+        runpodId: job.runpodId,
+        endpoint: env.SUBMIT_PROXY_URL,
+        timestamp: new Date().toISOString(),
+      });
+      const proxyRes = await fetch(
+        `${env.SUBMIT_PROXY_URL.replace(/\/$/, "")}/proxy/runpod/status/${encodeURIComponent(job.runpodId)}`,
+        {
+          headers: {
+            Authorization: env.RUNPOD_API_KEY ? `Bearer ${env.RUNPOD_API_KEY}` : "",
+          },
+        }
+      );
+      const proxyText = await proxyRes.text();
+      if (!proxyRes.ok) {
+        throw new Error(proxyText || "Submit proxy status failed");
+      }
+      const proxyJson = JSON.parse(proxyText);
+      const run = proxyJson?.status;
       const status = String(run?.status || "").toUpperCase();
 
       if (status === "COMPLETED" || status === "SUCCESS") {
         await updateQwenJob(env, jobId, { status: "uploading", progress: 90 });
         const output = run?.output ?? run?.result ?? run;
-        const base64 = extractBase64Png(output);
+        const base64 =
+          typeof output?.image_base64 === "string"
+            ? output.image_base64
+            : typeof output?.image === "string"
+              ? output.image
+              : typeof output?.images?.[0]?.base64 === "string"
+                ? output.images[0].base64
+                : typeof output?.images?.[0] === "string"
+                  ? output.images[0]
+                  : null;
         let bytes: Uint8Array | null = null;
         if (base64) {
           const raw = base64.includes(",") ? base64.split(",").pop() || "" : base64;
@@ -57,7 +88,18 @@ export async function handleJobStatus(req: Request, env: Env, jobId: string) {
           }
           bytes = buffer;
         } else {
-          const url = extractOutputImageUrl(output);
+          const url =
+            typeof output?.url === "string"
+              ? output.url
+              : typeof output?.image_url === "string"
+                ? output.image_url
+                : typeof output?.result_url === "string"
+                  ? output.result_url
+                  : typeof output?.images?.[0]?.url === "string"
+                    ? output.images[0].url
+                    : typeof output?.images?.[0] === "string"
+                      ? output.images[0]
+                      : null;
           if (url) {
             const res = await fetch(url);
             if (!res.ok) throw new Error(`RunPod output fetch failed: ${res.status}`);
