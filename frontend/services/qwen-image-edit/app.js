@@ -1,5 +1,6 @@
 const States = {
   idle: 'idle',
+  uploading: 'uploading',
   processing: 'processing',
   done: 'done',
   error: 'error'
@@ -11,6 +12,10 @@ const STATUS_LABELS = {
   generating: 'Generating result',
   finalizing: 'Finalizing output'
 }
+
+const API_BASE = 'https://ob-ai-api.your-domain'
+const API_CREATE = `${API_BASE}/qwen/image-edit`
+const API_STATUS = `${API_BASE}/jobs`
 
 const elements = {
   body: document.body,
@@ -45,11 +50,6 @@ const elements = {
   result: document.getElementById('state-result')
 }
 
-const API_CREATE = '/api/qwen-image-edit'
-const API_STATUS = '/api/job'
-const MOCK_API = true
-const mockJobs = new Map()
-
 let selectedFile = null
 let previewUrl = ''
 let pollTimer = null
@@ -61,7 +61,10 @@ let machine = {
     resultUrl: '',
     error: '',
     progress: 0,
-    statusText: STATUS_LABELS.uploading
+    statusText: STATUS_LABELS.uploading,
+    reuse: false,
+    lastPrompt: '',
+    lastPresets: []
   }
 }
 
@@ -76,27 +79,31 @@ function reduceState(state, context, event) {
   switch (event.type) {
     case 'SUBMIT':
       return {
-        state: States.processing,
+        state: States.uploading,
         context: {
           ...next,
           jobId: null,
           resultUrl: '',
           error: '',
           progress: 0,
-          statusText: STATUS_LABELS.uploading
+          statusText: STATUS_LABELS.uploading,
+          reuse: event.reuse || false,
+          lastPrompt: event.prompt,
+          lastPresets: event.presets
         }
       }
     case 'JOB_ACCEPTED':
       return {
-        state: state === States.processing ? state : States.processing,
+        state: States.processing,
         context: {
           ...next,
-          jobId: event.jobId
+          jobId: event.jobId,
+          statusText: STATUS_LABELS.processing
         }
       }
     case 'JOB_PROGRESS':
       return {
-        state: state === States.processing ? state : States.processing,
+        state: States.processing,
         context: {
           ...next,
           progress: event.progress ?? next.progress,
@@ -137,7 +144,7 @@ function reduceState(state, context, event) {
 
 function render() {
   const { state, context } = machine
-  const isProcessing = state === States.processing
+  const isProcessing = state === States.uploading || state === States.processing
   const isDone = state === States.done
 
   elements.showroom.classList.toggle('is-active', state === States.idle || state === States.error)
@@ -237,7 +244,8 @@ function handleFile(file) {
 }
 
 function updateGenerateState() {
-  elements.generateBtn.disabled = !isFormReady() || machine.state === States.processing
+  const busy = machine.state === States.uploading || machine.state === States.processing
+  elements.generateBtn.disabled = !isFormReady() || busy
 }
 
 function handlePresetClick(event) {
@@ -261,21 +269,31 @@ function handleDetailChange() {
   elements.detailValue.textContent = elements.detailStrength.value
 }
 
-async function handleGenerate() {
+function getActivePresets() {
+  return Array.from(elements.presetChips.querySelectorAll('.chip.is-active')).map((chip) => chip.dataset.prompt).filter(Boolean)
+}
+
+async function handleGenerate(options = {}) {
   if (!isFormReady()) {
     setInlineError('Add an image and a prompt to continue.')
     return
   }
 
-  transition({ type: 'SUBMIT' })
+  const reuse = !!options.reuse
+  const prompt = elements.promptInput.value.trim()
+  const presets = getActivePresets()
+
+  transition({ type: 'SUBMIT', reuse, prompt, presets })
 
   try {
     const formData = new FormData()
-    formData.append('prompt', elements.promptInput.value.trim())
+    formData.append('prompt', prompt)
     formData.append('ratio', elements.ratioSelect.value)
     formData.append('model', 'qwen-image')
     formData.append('service', 'qwen-image-edit')
     formData.append('image', selectedFile)
+    formData.append('presets', JSON.stringify(presets))
+    formData.append('reuse', reuse ? 'true' : 'false')
     formData.append(
       'options',
       JSON.stringify({
@@ -285,14 +303,11 @@ async function handleGenerate() {
     )
 
     const data = await createJobRequest(formData)
-    if (!data.ok) {
-      throw new Error(data.error || 'Failed to start generation.')
+    if (!data?.jobId) {
+      throw new Error('Failed to start generation.')
     }
 
-    const id = data.job_id || data.jobId || data.job?.id
-    if (!id) throw new Error('Job ID missing from response.')
-
-    transition({ type: 'JOB_ACCEPTED', jobId: id })
+    transition({ type: 'JOB_ACCEPTED', jobId: data.jobId })
     startPolling()
   } catch (error) {
     transition({ type: 'JOB_FAILED', error: error.message || 'Generation failed.' })
@@ -304,27 +319,24 @@ async function checkStatus() {
 
   try {
     const data = await getJobStatus(machine.context.jobId)
-    if (!data.ok) {
-      throw new Error(data.error || 'Failed to fetch job status.')
-    }
+    const status = data?.status
 
-    const status = data.job?.status
     if (status === 'done') {
-      const resultUrl = data.job?.result_url || previewUrl
-      if (!resultUrl) throw new Error('Missing result URL.')
+      if (!data.outputUrl) throw new Error('Missing result URL.')
       stopPolling()
-      transition({ type: 'JOB_DONE', resultUrl })
+      transition({ type: 'JOB_DONE', resultUrl: data.outputUrl })
       return
     }
 
     if (status === 'error') {
-      throw new Error('Generation failed on the server.')
+      throw new Error(data.message || 'Generation failed on the server.')
     }
 
+    const progress = typeof data?.progress === 'number' ? data.progress : machine.context.progress
     transition({
       type: 'JOB_PROGRESS',
-      progress: data.job?.progress ?? machine.context.progress,
-      statusText: mapStatusText(status)
+      progress,
+      statusText: mapStatusText(status, progress)
     })
   } catch (error) {
     stopPolling()
@@ -332,10 +344,14 @@ async function checkStatus() {
   }
 }
 
-function mapStatusText(status) {
+function mapStatusText(status, progress) {
   if (status === 'uploading') return STATUS_LABELS.uploading
-  if (status === 'processing') return STATUS_LABELS.processing
-  if (status === 'generating') return STATUS_LABELS.generating
+  if (status === 'processing') {
+    if (typeof progress === 'number' && progress >= 70) {
+      return STATUS_LABELS.generating
+    }
+    return STATUS_LABELS.processing
+  }
   if (status === 'finalizing') return STATUS_LABELS.finalizing
   return STATUS_LABELS.processing
 }
@@ -345,7 +361,7 @@ function handleRegen() {
     setInlineError('Upload an image to generate again.')
     return
   }
-  handleGenerate()
+  handleGenerate({ reuse: true })
 }
 
 function openLightbox() {
@@ -361,66 +377,26 @@ function closeLightbox() {
 }
 
 async function createJobRequest(formData) {
-  if (MOCK_API) {
-    return mockCreateJob(previewUrl)
-  }
-
   const response = await fetch(API_CREATE, {
     method: 'POST',
     body: formData
   })
-  const data = await response.json()
-  return response.ok ? data : { ok: false, error: data?.error || 'Request failed.' }
+
+  if (!response.ok) {
+    return null
+  }
+
+  return response.json()
 }
 
 async function getJobStatus(id) {
-  if (MOCK_API) {
-    return mockGetJob(id)
+  const response = await fetch(`${API_STATUS}/${encodeURIComponent(id)}`)
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch job status.')
   }
 
-  const response = await fetch(`${API_STATUS}/${id}`)
-  const data = await response.json()
-  return response.ok ? data : { ok: false, error: data?.error || 'Status failed.' }
-}
-
-function mockCreateJob(resultUrl) {
-  const id = crypto.randomUUID()
-  mockJobs.set(id, {
-    id,
-    createdAt: Date.now(),
-    resultUrl
-  })
-  return Promise.resolve({ ok: true, job_id: id })
-}
-
-function mockGetJob(id) {
-  const job = mockJobs.get(id)
-  if (!job) {
-    return Promise.resolve({ ok: false, error: 'Job not found.' })
-  }
-
-  const elapsed = Date.now() - job.createdAt
-  const progress = Math.min(100, Math.floor(elapsed / 120))
-  let status = 'uploading'
-  if (progress >= 100) {
-    status = 'done'
-  } else if (progress >= 90) {
-    status = 'finalizing'
-  } else if (progress >= 60) {
-    status = 'generating'
-  } else if (progress >= 25) {
-    status = 'processing'
-  }
-
-  return Promise.resolve({
-    ok: true,
-    job: {
-      id,
-      status,
-      progress,
-      result_url: job.resultUrl
-    }
-  })
+  return response.json()
 }
 
 elements.sidebarToggle.addEventListener('click', () => {
@@ -458,7 +434,7 @@ elements.presetChips.addEventListener('click', handlePresetClick)
 
 elements.detailStrength.addEventListener('input', handleDetailChange)
 
-elements.generateBtn.addEventListener('click', handleGenerate)
+elements.generateBtn.addEventListener('click', () => handleGenerate({ reuse: false }))
 
 elements.regenBtn.addEventListener('click', handleRegen)
 

@@ -467,3 +467,31 @@ Notes for Next Session
 - Known limitations: stub endpoints only; real API wiring pending
 - Safe next steps: hook `/api/qwen-image-edit` and `/api/job/:id` to backend
 - Warnings or guardrails: keep stubs aligned with backend response schema
+## 2026-01-16 22:51 Session Summary
+
+### Objective
+- Remove debug mode and connect the Qwen Image Edit UI to real async API endpoints with a state machine
+
+### Actions Performed
+- Files modified: `frontend/services/qwen-image-edit/app.js`, `services/qwen-image-edit/app.js`, `OB_Coex.md`
+- Logic added: explicit idle/uploading/processing/done/error state machine, real API POST/GET wiring, reuse flag for re-generate
+- Mocks or stubs introduced: none
+- Config updates: none
+
+### Commands Executed
+- `Get-Date -Format "yyyy-MM-dd HH:mm"`
+
+### Validation
+- What was verified: not run (no automated checks executed)
+- What passed (typecheck, tests, runtime): not run
+- What was NOT tested (if any): frontend runtime, API connectivity
+
+### Runtime Status
+- Local or Production: local
+- Mock mode ON or OFF: mock mode OFF for frontend API calls
+- Worker running or stopped: stopped
+
+### Notes for Next Session
+- Known limitations: API base URL placeholder must be replaced with the real domain
+- Safe next steps: verify API responses and polling behavior in production
+- Warnings or guardrails: keep UI states aligned with job status responses
