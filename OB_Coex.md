@@ -947,3 +947,33 @@ Runtime Status
 Notes for Next Session
 - Ensure RUNPOD_API_KEY secret is set for submit proxy
 - Verify RunPod job creation and timestamps via NEW_JOB_SUBMITTED logs
+2026-01-17 0224 Session Summary
+
+Objective
+- Add audit logging and auditor endpoints to submit proxy and ensure worker forwards with request metadata
+
+Actions Performed
+- Files modified: submit-proxy/src/index.ts, src/routes/qwen.image-edit.ts, src/routes/jobs.status.ts, src/routes/queue.ts, src/routes/queue.create.ts, src/routes/runpod-poll.ts, OB_Coex.md
+- Logic changes: submit proxy emits structured audit logs, exposes /health and /debug/last-job, worker forwards x-request-id and source headers
+- Config changes: none
+
+Commands Executed
+- 
+px wrangler deploy --config submit-proxy/wrangler.toml --env production
+- 
+px wrangler deploy --env production
+- curl.exe -s -X POST "https://ob-ai-submit-proxy.legacy-project.workers.dev/submit" -H "Content-Type: application/json" -H "x-request-id: audit-4" -H "x-ob-source: worker" -d "{}"
+- curl.exe -s "https://ob-ai-submit-proxy.legacy-project.workers.dev/health"
+- curl.exe -s "https://ob-ai-submit-proxy.legacy-project.workers.dev/debug/last-job"
+
+Validation
+- Verified submit proxy endpoints respond and logs returned in error payload
+- Not tested: successful RunPod submission with NEW_JOB_SUBMITTED due to missing RunPod API key in proxy
+
+Runtime Status
+- Production workers deployed (ob-ai-api, ob-ai-submit-proxy)
+- Mock mode OFF (production validation enforced)
+- Worker running
+
+Notes for Next Session
+- Provide RUNPOD_API_KEY to submit proxy or confirm key forwarding to enable NEW_JOB_SUBMITTED

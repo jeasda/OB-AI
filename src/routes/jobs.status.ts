@@ -50,7 +50,12 @@ export async function handleJobStatus(req: Request, env: Env, jobId: string) {
         timestamp: new Date().toISOString(),
       });
       const proxyRes = await fetch(
-        `${env.SUBMIT_PROXY_URL.replace(/\/$/, "")}/status/${encodeURIComponent(job.runpodId)}`
+        `${env.SUBMIT_PROXY_URL.replace(/\/$/, "")}/status/${encodeURIComponent(job.runpodId)}`,
+        {
+          headers: {
+            Authorization: env.RUNPOD_API_KEY ? `Bearer ${env.RUNPOD_API_KEY}` : "",
+          },
+        }
       );
       const proxyText = await proxyRes.text();
       if (!proxyRes.ok) {

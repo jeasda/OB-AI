@@ -7,6 +7,13 @@ type Env = {
 
 const RUNPOD_TIMEOUT_MS = 60_000
 const RUNPOD_RETRIES = 2
+let lastJob: {
+  requestId: string
+  timestamp: string
+  runpodJobId: string | null
+  runpodEndpointId: string | null
+} | null = null
+let lastLogs: string[] = []
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -18,6 +25,12 @@ function json(data: unknown, status = 200) {
       'Access-Control-Allow-Headers': '*'
     }
   })
+}
+
+function emitLog(event: string, fields: Record<string, unknown>) {
+  const line = JSON.stringify({ event, ...fields })
+  console.log(line)
+  lastLogs = [...lastLogs.slice(-9), line]
 }
 
 async function runpodFetch(url: string, init: RequestInit) {
@@ -54,13 +67,11 @@ async function submitToRunPod(env: Env, payload: Record<string, unknown>, apiKey
   }
   const url = `${runpodBase(env)}/${env.RUNPOD_ENDPOINT}/run`
   const bodyText = JSON.stringify({ input: payload })
-  console.log(JSON.stringify({
-    level: 'info',
-    event: 'RUNPOD_SUBMIT_ATTEMPT',
+  emitLog('RUNPOD_SUBMIT_ATTEMPT', {
     endpoint: env.RUNPOD_ENDPOINT,
     payloadSize: bodyText.length,
     timestamp: new Date().toISOString()
-  }))
+  })
 
   const res = await runpodFetch(url, {
     method: 'POST',
@@ -72,35 +83,36 @@ async function submitToRunPod(env: Env, payload: Record<string, unknown>, apiKey
   })
   const raw = await res.text()
   if (!res.ok) {
-    console.error(JSON.stringify({
-      level: 'error',
-      event: 'RUNPOD_RESPONSE_ERROR',
+    emitLog('RUNPOD_RESPONSE_ERROR', {
       endpoint: env.RUNPOD_ENDPOINT,
       status: res.status,
       timestamp: new Date().toISOString(),
       bodyPreview: raw.slice(0, 512)
-    }))
+    })
     throw new Error(raw || 'RunPod API error')
   }
-  console.log(JSON.stringify({
-    level: 'info',
-    event: 'RUNPOD_RESPONSE_OK',
+  emitLog('RUNPOD_RESPONSE_OK', {
     endpoint: env.RUNPOD_ENDPOINT,
     status: res.status,
     timestamp: new Date().toISOString()
-  }))
+  })
   const jsonBody = JSON.parse(raw)
   const runpodId = jsonBody?.id || jsonBody?.job_id
   if (!runpodId) {
     throw new Error('RunPod response missing job id')
   }
-  console.log(JSON.stringify({
-    level: 'info',
-    event: 'NEW_JOB_SUBMITTED',
-    jobId: jsonBody?.id || jsonBody?.job_id,
-    runpodRequestId: runpodId,
+  emitLog('NEW_JOB_SUBMITTED', {
+    requestId: lastJob?.requestId || 'unknown',
+    runpodJobId: runpodId,
+    runpodEndpointId: env.RUNPOD_ENDPOINT,
     timestamp: new Date().toISOString()
-  }))
+  })
+  lastJob = {
+    requestId: lastJob?.requestId || 'unknown',
+    timestamp: new Date().toISOString(),
+    runpodJobId: runpodId,
+    runpodEndpointId: env.RUNPOD_ENDPOINT
+  }
   return jsonBody
 }
 
@@ -149,12 +161,28 @@ export default {
     }
 
     try {
+      if (req.method === 'GET' && url.pathname === '/health') {
+        return json({ status: 'ok', timestamp: new Date().toISOString() })
+      }
+
+      if (req.method === 'GET' && url.pathname === '/debug/last-job') {
+        return json({
+          requestId: lastJob?.requestId || null,
+          timestamp: lastJob?.timestamp || null,
+          runpodJobId: lastJob?.runpodJobId || null,
+          logs: lastLogs
+        })
+      }
+
       if (req.method === 'POST' && url.pathname === '/submit') {
-        console.log(JSON.stringify({
-          level: 'info',
-          event: 'SUBMIT_PROXY_RECEIVED',
-          timestamp: new Date().toISOString()
-        }))
+        const requestId = req.headers.get('x-request-id') || crypto.randomUUID()
+        const source = req.headers.get('x-ob-source') || 'unknown'
+        emitLog('SUBMIT_PROXY_RECEIVED', {
+          timestamp: new Date().toISOString(),
+          requestId,
+          path: url.pathname,
+          source
+        })
         const raw = await req.text()
         if (!raw) return json({ error: 'empty body' }, 400)
         let payload: unknown
@@ -168,14 +196,20 @@ export default {
           ? authHeader.slice(7).trim()
           : ''
         const apiKey = bearerKey || req.headers.get('x-runpod-api-key') || undefined
-        console.log(JSON.stringify({
-          level: 'info',
-          event: 'SUBMIT_PROXY_AUTH',
+        emitLog('SUBMIT_PROXY_AUTH', {
           timestamp: new Date().toISOString(),
+          requestId,
           apiKeyLength: apiKey ? apiKey.length : 0
-        }))
+        })
+        lastJob = {
+          requestId,
+          timestamp: new Date().toISOString(),
+          runpodJobId: null,
+          runpodEndpointId: env.RUNPOD_ENDPOINT
+        }
         const run = await submitToRunPod(env, payload as Record<string, unknown>, apiKey)
         return json({
+          requestId,
           jobId: run?.id || run?.job_id,
           runpodRequestId: run?.id || run?.job_id
         })
@@ -195,13 +229,11 @@ export default {
 
       return json({ error: 'Not Found' }, 404)
     } catch (error: any) {
-      console.error(JSON.stringify({
-        level: 'error',
-        event: 'RUNPOD_RESPONSE_ERROR',
+      emitLog('RUNPOD_RESPONSE_ERROR', {
         errorMessage: error?.message || 'submit proxy error',
         timestamp: new Date().toISOString()
-      }))
-      return json({ error: error?.message || 'submit proxy error' }, 500)
+      })
+      return json({ error: error?.message || 'submit proxy error', logs: lastLogs }, 500)
     }
   }
 }

@@ -169,7 +169,10 @@ export async function handleQueueCreate(req: Request, env: Env) {
       });
       const proxyRes = await fetch(`${env.SUBMIT_PROXY_URL.replace(/\/$/, "")}/submit`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: env.RUNPOD_API_KEY ? `Bearer ${env.RUNPOD_API_KEY}` : "",
+        },
         body: JSON.stringify(input),
       });
       const proxyText = await proxyRes.text();
@@ -209,7 +212,10 @@ export async function handleQueueCreate(req: Request, env: Env) {
     });
     const proxyRes = await fetch(`${env.SUBMIT_PROXY_URL.replace(/\/$/, "")}/submit`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: env.RUNPOD_API_KEY ? `Bearer ${env.RUNPOD_API_KEY}` : "",
+      },
       body: JSON.stringify(input),
     });
     const proxyText = await proxyRes.text();

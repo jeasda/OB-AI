@@ -139,6 +139,9 @@ async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "x-request-id": jobId,
+          "x-ob-source": "worker",
+          Authorization: env.RUNPOD_API_KEY ? `Bearer ${env.RUNPOD_API_KEY}` : "",
         },
         body: JSON.stringify(runpodPayload),
       });

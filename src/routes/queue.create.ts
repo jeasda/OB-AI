@@ -32,7 +32,10 @@ export async function handleQueueCreate(req: Request, env: Env) {
     });
     const proxyRes = await fetch(`${env.SUBMIT_PROXY_URL.replace(/\/$/, "")}/submit`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: env.RUNPOD_API_KEY ? `Bearer ${env.RUNPOD_API_KEY}` : "",
+      },
       body: JSON.stringify({ prompt, ratio, model }),
     });
     const proxyText = await proxyRes.text();

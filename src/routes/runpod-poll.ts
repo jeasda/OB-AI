@@ -25,7 +25,11 @@ export async function handlePoll(
     endpoint: env.SUBMIT_PROXY_URL,
     timestamp: new Date().toISOString(),
   });
-  const proxyRes = await fetch(`${env.SUBMIT_PROXY_URL.replace(/\/$/, "")}/status/${encodeURIComponent(jobId)}`);
+  const proxyRes = await fetch(`${env.SUBMIT_PROXY_URL.replace(/\/$/, "")}/status/${encodeURIComponent(jobId)}`, {
+    headers: {
+      Authorization: env.RUNPOD_API_KEY ? `Bearer ${env.RUNPOD_API_KEY}` : "",
+    },
+  });
   const proxyText = await proxyRes.text();
   if (!proxyRes.ok) {
     return errorResponse(proxyText || "Submit proxy failed", requestId, 502);
