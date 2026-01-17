@@ -72,6 +72,13 @@ export default {
     const handleRequest = async (): Promise<Response> => {
       const url = new URL(req.url);
       const requestId = getRequestId(req);
+      if (url.pathname === "/qwen/image-edit") {
+        // Phase 1.1 auth bypass  MUST be removed or restricted after Phase 1.1
+        logEvent("info", "API_AUTH_BYPASS_PHASE_1_1", {
+          path: url.pathname,
+          ts: new Date().toISOString(),
+        });
+      }
 
     const validation = validateEnv(env);
     if (!validation.ok) {

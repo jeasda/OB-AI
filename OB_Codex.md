@@ -529,3 +529,14 @@ Phase 1.1 only
 
 How to lock down later
 - Replace wildcard origin with allowlist and restrict methods/headers in `src/index.ts` (`corsHeaders()`).
+## [2026-01-17 14:26] Phase 1.1 /qwen/image-edit 401 Removal
+
+What caused the 401
+- Submit-proxy returned 401 from RunPod and the API worker forwarded it to the frontend.
+
+Auth bypass location
+- `src/index.ts` logs `API_AUTH_BYPASS_PHASE_1_1` for `/qwen/image-edit` and explicitly bypasses any future auth/guards.
+- `src/routes/qwen.image-edit.ts` maps submit-proxy 401 to 502 so `/qwen/image-edit` never returns 401.
+
+Phase 1.1 only
+- This bypass must be removed or restricted after Phase 1.1.

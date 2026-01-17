@@ -175,9 +175,17 @@ async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
         timestamp: new Date().toISOString(),
       });
       if (!proxyRes.ok) {
+        if (proxyRes.status === 401) {
+          logEvent("warn", "API_PROXY_AUTH_401", {
+            trace_id: jobId,
+            status: proxyRes.status,
+            bodyPreview,
+            timestamp: new Date().toISOString(),
+          });
+        }
         return {
           proxyResponse: new Response(proxyText, {
-            status: proxyRes.status,
+            status: proxyRes.status === 401 ? 502 : proxyRes.status,
             headers: {
               "content-type": proxyRes.headers.get("content-type") || "application/json",
             },
