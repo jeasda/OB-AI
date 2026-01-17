@@ -577,3 +577,38 @@ Hardening summary
 How to read the trace
 - The failing step is in `step` in the response and `LOG_STEP_FAIL` logs.
 - Current failure example: `step=PARSE_PROXY_RESPONSE` with message showing submit-proxy 401/RunPod error.
+## [2026-01-17 14:52] Phase 1.1 Minimal Bypass Mode
+
+Temporary diagnostic mode
+- `/qwen/image-edit` now skips input parsing and R2 upload, and submits a minimal JSON payload to submit-proxy to isolate API worker crashes.
+- Logs: `PHASE_1_1_MINIMAL_START`, `MINIMAL_PROXY_CALL_START`, `MINIMAL_PROXY_CALL_DONE`, `MINIMAL_PROXY_CALL_FAIL`.
+
+Reason
+- Isolate submit-proxy/RunPod failures before re-enabling file/R2 logic.
+## [2026-01-17 15:04] Phase 1.1 Validation Bypass
+
+Rationale
+- Contract validation can reject Phase 1.1 traffic; bypass keeps the loop unblocked while logging injected defaults.
+
+Defaults injected
+- `service: "qwen-image-edit"`
+- `ratio: "9:16"`
+- `workflow: "image_qwen_image_edit_2509.json"`
+
+Phase 1.2+
+- Restore strict validation and remove `PHASE_1_1_VALIDATION_BYPASSED` / injected defaults.
+## [2026-01-17 15:10] Workflow Contract Requirements
+
+Contract fields (validateWorkflowContractV1)
+- `prompt` (non-empty string)
+- `ratio` (one of `1:1`, `16:9`, `9:16`)
+- `imageFile` present
+- `options` must be object if provided
+## [2026-01-17 15:20] Submit Proxy URL Contract
+
+Proxy URL contract
+- Submit proxy calls must use a base URL only and append `/submit` exactly: `${SUBMIT_PROXY_URL}/submit`.
+- `/health` success does not guarantee `/submit` reachability (workers.dev 1042 can still block POST).
+
+Phase 1.1 done condition
+- `/qwen/image-edit` returns 200 (no 502), submit-proxy logs `SUBMIT_PROXY_RECEIVED`, RunPod job appears.

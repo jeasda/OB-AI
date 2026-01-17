@@ -50,7 +50,7 @@ function parseBoolean(value: unknown) {
   return false;
 }
 
-async function parseRequest(request: Request): Promise<ParsedRequest> {
+async function parseRequest(request: Request, requestId?: string): Promise<ParsedRequest> {
   const contentType = request.headers.get("content-type") || "";
   if (contentType.includes("application/json")) {
     const body: any = await request.json();
@@ -66,6 +66,14 @@ async function parseRequest(request: Request): Promise<ParsedRequest> {
   }
 
   const formData = await request.formData();
+  if (requestId) {
+    const keys = Array.from(formData.keys());
+    logEvent("info", "FORMDATA_KEYS", {
+      requestId,
+      keys,
+      timestamp: new Date().toISOString(),
+    });
+  }
   const file = formData.get("image");
   const image = file instanceof File ? new Uint8Array(await file.arrayBuffer()) : null;
   const presets = normalizePresets(formData.get("presets"));
@@ -153,6 +161,7 @@ async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
     prompt,
     ratio: "9:16",
     service: "qwen-image-edit",
+    workflow: "image_qwen_image_edit_2509.json",
     requestId: jobId,
   };
 
@@ -162,22 +171,25 @@ async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
       step = "CALL_PROXY";
+      const submitUrl = `${submitProxyBase}/submit`;
+      const payloadJson = JSON.stringify(runpodPayload);
       logStep("info", "LOG_STEP_START", step, {
         requestId: jobId,
-        url: `${submitProxyBase}/submit`,
+        url: submitUrl,
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        payloadSize: payloadJson.length,
         timestamp: new Date().toISOString(),
         attempt,
       });
       let proxyRes: Response;
       try {
-        proxyRes = await submitProxyFetch(env, jobId, "/submit", {
+        proxyRes = await fetch(submitUrl, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-request-id": jobId,
-            "x-ob-source": "worker",
           },
-          body: JSON.stringify(runpodPayload),
+          body: payloadJson,
         });
       } catch (error: any) {
         logStep("error", "LOG_STEP_FAIL", step, {
@@ -217,9 +229,12 @@ async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
           bodyPreview,
           timestamp: new Date().toISOString(),
         });
-        const error: any = new Error(`Submit proxy error: ${proxyRes.status} ${bodyPreview}`);
-        error.step = step;
-        throw error;
+        return {
+          proxyError: {
+            status: proxyRes.status,
+            body: proxyText,
+          },
+        };
       }
       let proxyJson: any;
       try {
@@ -308,6 +323,7 @@ export async function handleQwenImageEdit(req: Request, env: Env, ctx: Execution
     timestamp: new Date().toISOString(),
   });
   let step = "READ_INPUT";
+  let validationBypassed = false;
   try {
     logStep("info", "LOG_STEP_START", step, {
       requestId,
@@ -315,7 +331,7 @@ export async function handleQwenImageEdit(req: Request, env: Env, ctx: Execution
     });
     let payload: ParsedRequest;
     try {
-      payload = await parseRequest(req);
+      payload = await parseRequest(req, requestId);
     } catch (error: any) {
       logStep("error", "LOG_STEP_FAIL", step, {
         requestId,
@@ -331,15 +347,31 @@ export async function handleQwenImageEdit(req: Request, env: Env, ctx: Execution
       requestId,
       timestamp: new Date().toISOString(),
     });
-    if (!payload.image) {
-      const error: any = new Error("image missing");
-      error.step = step;
-      throw error;
-    }
+    const injected: string[] = ["service", "ratio", "workflow"];
     if (!payload.prompt) {
-      const error: any = new Error("prompt missing");
-      error.step = step;
-      throw error;
+      payload.prompt = "change her outfit color to blue, editorial look, soft contrast";
+      injected.push("prompt");
+    }
+    if (!payload.image) {
+      logEvent("warn", "PHASE_1_1_VALIDATION_BYPASSED", {
+        requestId,
+        reason: "image missing",
+        timestamp: new Date().toISOString(),
+      });
+      validationBypassed = true;
+    }
+    const normalized = {
+      service: "qwen-image-edit",
+      ratio: "9:16",
+      workflow: "image_qwen_image_edit_2509.json",
+    };
+    if (injected.length > 0) {
+      logEvent("info", "PHASE_1_1_FIELDS_INJECTED", {
+        requestId,
+        fields: injected,
+        timestamp: new Date().toISOString(),
+      });
+      validationBypassed = true;
     }
     if (!env.R2_RESULTS) {
       const error: any = new Error("R2_RESULTS binding missing in API Worker environment");
@@ -357,16 +389,30 @@ export async function handleQwenImageEdit(req: Request, env: Env, ctx: Execution
     logEvent("info", "qwen.job.created", { jobId: job.jobId, created_at_ms: Date.now() });
     step = "PROCESS_JOB";
     const result = await processJob(env, job.jobId, payload);
-    if ((result as any)?.proxyResponse) {
+    if ((result as any)?.proxyError) {
+      const proxyError = (result as any).proxyError;
       await updateQwenJob(env, job.jobId, {
         status: "error",
         progress: 0,
         error: "Submit proxy error",
       });
-      return (result as any).proxyResponse;
+      return jsonResponse(
+        {
+          error: "SUBMIT_PROXY_ERROR",
+          details: proxyError?.body || "",
+          requestId,
+          validationBypassed,
+        },
+        { status: 502, headers: corsHeaders() }
+      );
     }
     return jsonResponse(
-      { job_id: job.jobId, status: "submitted" },
+      {
+        job_id: job.jobId,
+        status: "submitted",
+        validationBypassed,
+        normalizedDefaults: normalized,
+      },
       { status: 200, headers: corsHeaders() }
     );
   } catch (error: any) {
