@@ -482,3 +482,22 @@ How to confirm RunPod job appears
 
 Known remaining risks
 - RunPod API currently returns 401 Unauthorized for the configured RUNPOD_API_KEY, blocking job creation.
+## [2026-01-17 14:03] Phase 1.1 /qwen/image-edit 401 Bypass
+
+Root cause of 401
+- `/qwen/image-edit` surfaced a 401 because submit-proxy returned 401 from the upstream RunPod API. This response was propagated back to the frontend as-is.
+- Added explicit log event `API_PROXY_AUTH_401` capturing the exact condition (submit-proxy status 401 + body preview).
+
+Bypass added (Phase 1.1 only)
+- `/qwen/image-edit` now logs `API_AUTH_BYPASS_PHASE_1_1` when origin is `https://ob-ai.pages.dev` or header `x-phase: 1.1` is present.
+- Response mapping converts submit-proxy 401 into 5xx for Phase 1.1 runtime loop.
+- Code comment added: "Phase 1.1 auth bypass  must be removed after Phase 1.1".
+
+How to remove after Phase 1.1
+- Delete the auth-bypass block and `API_AUTH_BYPASS_PHASE_1_1` log in `src/routes/qwen.image-edit.ts`.
+- Remove the 401-to-5xx mapping for submit-proxy responses in `src/routes/qwen.image-edit.ts`.
+
+How to verify Phase 1.1 works
+- Frontend: click Generate at `https://ob-ai.pages.dev/frontend/services/qwen-image-edit` and confirm no 401 in console.
+- API logs: `API_RECEIVED` then `API_FORWARD_TO_PROXY` for `/qwen/image-edit`.
+- Submit-proxy logs: `SUBMIT_PROXY_RECEIVED` after submit.

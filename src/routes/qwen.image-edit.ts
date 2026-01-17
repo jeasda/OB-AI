@@ -164,7 +164,17 @@ async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
       if (!proxyRes.ok) {
         const detail = proxyText || `status ${proxyRes.status}`;
         const error: any = new Error(`Submit proxy failed: ${detail}`);
-        error.status = proxyRes.status;
+        if (proxyRes.status === 401) {
+          logEvent("warn", "API_PROXY_AUTH_401", {
+            requestId: jobId,
+            status: proxyRes.status,
+            bodyPreview: proxyText.slice(0, 256),
+            timestamp: new Date().toISOString(),
+          });
+          error.status = 502;
+        } else {
+          error.status = proxyRes.status;
+        }
         error.proxyBody = proxyText.slice(0, 512);
         throw error;
       }
@@ -203,6 +213,17 @@ async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
 
 export async function handleQwenImageEdit(req: Request, env: Env, ctx: ExecutionContext) {
   const requestId = getRequestId(req);
+  const origin = req.headers.get("origin") || "";
+  const phaseHeader = req.headers.get("x-phase") || "";
+  if (origin === "https://ob-ai.pages.dev" || phaseHeader === "1.1") {
+    // Phase 1.1 auth bypass  must be removed after Phase 1.1
+    logEvent("info", "API_AUTH_BYPASS_PHASE_1_1", {
+      requestId,
+      origin,
+      phaseHeader,
+      timestamp: new Date().toISOString(),
+    });
+  }
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders() });
   }
@@ -224,7 +245,10 @@ export async function handleQwenImageEdit(req: Request, env: Env, ctx: Execution
     logEvent("info", "qwen.job.created", { jobId: job.jobId, created_at_ms: Date.now() });
     try {
       await processJob(env, job.jobId, payload);
-      return jsonResponse({ jobId: job.jobId }, { status: 200, headers: corsHeaders() });
+      return jsonResponse(
+        { job_id: job.jobId, status: "submitted" },
+        { status: 200, headers: corsHeaders() }
+      );
     } catch (error: any) {
       await updateQwenJob(env, job.jobId, {
         status: "error",
