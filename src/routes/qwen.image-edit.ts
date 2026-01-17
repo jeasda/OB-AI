@@ -92,9 +92,18 @@ async function parseRequest(request: Request): Promise<ParsedRequest> {
 
 async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
   const { image, prompt } = payload;
+  let stage = "init";
   await updateQwenJob(env, jobId, { status: "processing", progress: 20 });
+  stage = "GUARD_CHECKS";
   if (!env.R2_RESULTS) {
-    throw new Error("R2_RESULTS is not set");
+    const error: any = new Error("R2_RESULTS binding missing");
+    error.stage = stage;
+    throw error;
+  }
+  if (!env.SUBMIT_PROXY_URL) {
+    const error: any = new Error("SUBMIT_PROXY_URL missing");
+    error.stage = stage;
+    throw error;
   }
   const imageType = payload.imageType || "image/png";
   const ext = imageType.includes("jpeg") || imageType.includes("jpg")
@@ -104,7 +113,8 @@ async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
       : "bin";
   const datePrefix = new Date().toISOString().slice(0, 10);
   const key = `${env.R2_PREFIX || "results"}/qwen-image-edit/${datePrefix}/${jobId}.${ext}`;
-  logEvent("info", "R2_UPLOAD_START", {
+  stage = "R2_PUT_START";
+  logEvent("info", "R2_PUT_START", {
     requestId: jobId,
     key,
     contentType: imageType,
@@ -116,7 +126,8 @@ async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
       contentType: imageType || "application/octet-stream",
     },
   });
-  logEvent("info", "R2_UPLOAD_OK", {
+  stage = "R2_PUT_OK";
+  logEvent("info", "R2_PUT_OK", {
     requestId: jobId,
     key,
     bytes: image.length,
@@ -136,11 +147,8 @@ async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
   const submitProxyBase = getSubmitProxyBase(env, jobId);
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
-      logEvent("info", "API_RECEIVED", {
-        requestId: jobId,
-        timestamp: new Date().toISOString(),
-      });
-      logEvent("info", "API_FORWARD_TO_PROXY", {
+      stage = "CALL_PROXY_START";
+      logEvent("info", "CALL_PROXY_START", {
         endpoint: submitProxyBase,
         timestamp: new Date().toISOString(),
         attempt,
@@ -168,7 +176,8 @@ async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
       }
       const proxyText = await proxyRes.text();
       const bodyPreview = proxyText.slice(0, 2048);
-      logEvent("info", "SUBMIT_PROXY_RESPONSE", {
+      stage = "CALL_PROXY_DONE";
+      logEvent("info", "CALL_PROXY_DONE", {
         trace_id: jobId,
         status: proxyRes.status,
         bodyPreview,
@@ -185,7 +194,7 @@ async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
         }
         return {
           proxyResponse: new Response(proxyText, {
-            status: proxyRes.status === 401 ? 502 : proxyRes.status,
+            status: proxyRes.status,
             headers: {
               "content-type": proxyRes.headers.get("content-type") || "application/json",
             },
@@ -197,12 +206,16 @@ async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
       break;
     } catch (error: any) {
       lastError = error;
-      logEvent("error", "API_ERROR", {
+      logEvent("error", "API_CRASH", {
         errorMessage: error?.message || "submit proxy failed",
         stack: error?.stack,
         endpoint: submitProxyBase,
+        stage,
         timestamp: new Date().toISOString(),
       });
+      if (error && !error.stage) {
+        error.stage = stage;
+      }
       if (attempt < 3) {
         await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
       }
@@ -247,61 +260,72 @@ export async function handleQwenImageEdit(req: Request, env: Env, ctx: Execution
     return jsonResponse({ error: "Method Not Allowed", requestId }, { status: 405, headers: corsHeaders() });
   }
 
+  let stage = "API_RECEIVED";
+  logEvent("info", "API_RECEIVED", {
+    requestId,
+    timestamp: new Date().toISOString(),
+  });
   try {
+    stage = "BODY_PARSE";
     const payload = await parseRequest(req);
+    logEvent("info", "BODY_PARSED", {
+      requestId,
+      timestamp: new Date().toISOString(),
+    });
     if (!payload.image) {
-      return jsonResponse({ error: "image is required", requestId }, { status: 400, headers: corsHeaders() });
+      const error: any = new Error("image missing");
+      error.stage = "BODY_PARSED";
+      throw error;
     }
     if (!payload.prompt) {
-      return jsonResponse({ error: "prompt is required", requestId }, { status: 400, headers: corsHeaders() });
+      const error: any = new Error("prompt missing");
+      error.stage = "BODY_PARSED";
+      throw error;
+    }
+    if (!env.R2_RESULTS) {
+      const error: any = new Error("R2_RESULTS binding missing");
+      error.stage = "GUARD_CHECKS";
+      throw error;
+    }
+    if (!env.SUBMIT_PROXY_URL) {
+      const error: any = new Error("SUBMIT_PROXY_URL missing");
+      error.stage = "GUARD_CHECKS";
+      throw error;
     }
 
+    stage = "JOB_CREATE";
     const job = await createQwenJob(env);
     logEvent("info", "qwen.job.created", { jobId: job.jobId, created_at_ms: Date.now() });
-    try {
-      const result = await processJob(env, job.jobId, payload);
-      if ((result as any)?.proxyResponse) {
-        await updateQwenJob(env, job.jobId, {
-          status: "error",
-          progress: 0,
-          error: "Submit proxy error",
-        });
-        return (result as any).proxyResponse;
-      }
-      return jsonResponse(
-        { job_id: job.jobId, status: "submitted" },
-        { status: 200, headers: corsHeaders() }
-      );
-    } catch (error: any) {
+    stage = "PROCESS_JOB";
+    const result = await processJob(env, job.jobId, payload);
+    if ((result as any)?.proxyResponse) {
       await updateQwenJob(env, job.jobId, {
         status: "error",
         progress: 0,
-        error: error?.message || "generation failed",
+        error: "Submit proxy error",
       });
-      if (error?.fetchFailed) {
-        return jsonResponse(
-          {
-            error: "FETCH_TO_SUBMIT_PROXY_FAILED",
-            details: error?.message || "submit proxy fetch failed",
-            requestId,
-          },
-          { status: 502, headers: corsHeaders() }
-        );
-      }
-      const status = typeof error?.status === "number" ? error.status : 502;
-      return jsonResponse(
-        {
-          error: error?.message || "generation failed",
-          requestId,
-          proxyBody: error?.proxyBody || null,
-        },
-        { status, headers: corsHeaders() }
-      );
+      return (result as any).proxyResponse;
     }
-  } catch (error: any) {
     return jsonResponse(
-      { error: error?.message || "invalid request", requestId },
-      { status: 400, headers: corsHeaders() }
+      { job_id: job.jobId, status: "submitted" },
+      { status: 200, headers: corsHeaders() }
+    );
+  } catch (error: any) {
+    const crashStage = error?.stage || stage;
+    logEvent("error", "API_CRASH", {
+      requestId,
+      stage: crashStage,
+      errorMessage: error?.message || "unknown error",
+      stack: error?.stack,
+      timestamp: new Date().toISOString(),
+    });
+    return jsonResponse(
+      {
+        error: "API_WORKER_CRASH",
+        stage: crashStage,
+        message: error?.message || "unknown error",
+      },
+      { status: 500, headers: corsHeaders() }
     );
   }
 }

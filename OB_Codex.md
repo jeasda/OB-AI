@@ -540,3 +540,23 @@ Auth bypass location
 
 Phase 1.1 only
 - This bypass must be removed or restricted after Phase 1.1.
+## [2026-01-17 14:33] Phase 1.1 /qwen/image-edit Full Trace
+
+New trace events
+- `API_RECEIVED` at request entry
+- `BODY_PARSED` after parsing body
+- `R2_PUT_START` before R2 upload
+- `R2_PUT_OK` after R2 upload
+- `CALL_PROXY_START` before submit-proxy call
+- `CALL_PROXY_DONE` after submit-proxy response (status + bodyPreview)
+- `API_CRASH` with `stage`, `errorMessage`, `stack`
+
+How to read the trace
+- The last emitted event before `API_CRASH` is the failing stage.
+- If `CALL_PROXY_DONE` shows non-2xx, the failure is in submit-proxy/RunPod.
+
+Failing stage meaning
+- `GUARD_CHECKS`: missing binding or config
+- `BODY_PARSED`: request malformed or missing image/prompt
+- `R2_PUT_START/OK`: R2 upload error
+- `CALL_PROXY_START/DONE`: submit-proxy or RunPod error
