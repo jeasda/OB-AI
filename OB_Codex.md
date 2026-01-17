@@ -560,3 +560,20 @@ Failing stage meaning
 - `BODY_PARSED`: request malformed or missing image/prompt
 - `R2_PUT_START/OK`: R2 upload error
 - `CALL_PROXY_START/DONE`: submit-proxy or RunPod error
+## [2026-01-17 14:37] Phase 1.1 Auth Bypass Log
+
+Auth bypass
+- API worker now logs `AUTH_BYPASS_APPLIED` for `/qwen/image-edit` on every request.
+- Any submit-proxy 401 is remapped to 500 so `/qwen/image-edit` never returns 401 in Phase 1.1.
+
+Phase 1.1 only
+- Remove `AUTH_BYPASS_APPLIED` and the 401→500 mapping after Phase 1.1.
+## [2026-01-17 14:46] Phase 1.1 Step-Level Runtime Tracing
+
+Hardening summary
+- Added step-level logs `LOG_STEP_START`, `LOG_STEP_OK`, `LOG_STEP_FAIL` around input parse, R2 upload, submit-proxy call, and proxy response parsing in `src/routes/qwen.image-edit.ts`.
+- `/qwen/image-edit` now returns `{ error, step, message, requestId }` with HTTP 500 on any failure.
+
+How to read the trace
+- The failing step is in `step` in the response and `LOG_STEP_FAIL` logs.
+- Current failure example: `step=PARSE_PROXY_RESPONSE` with message showing submit-proxy 401/RunPod error.
