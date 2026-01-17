@@ -45,10 +45,33 @@ function validateEnv(env: Env): EnvValidation {
   return { ok: true };
 }
 
+function corsHeaders() {
+  const headers = new Headers();
+  // Phase 1.1 CORS  REMOVE or RESTRICT after Phase 1.1
+  headers.set("Access-Control-Allow-Origin", "*");
+  headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
+  return headers;
+}
+
+function withCors(resp: Response) {
+  const headers = new Headers(resp.headers);
+  corsHeaders().forEach((value, key) => headers.set(key, value));
+  return new Response(resp.body, {
+    status: resp.status,
+    statusText: resp.statusText,
+    headers,
+  });
+}
+
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const url = new URL(req.url);
-    const requestId = getRequestId(req);
+    if (req.method === "OPTIONS") {
+      return new Response(null, { status: 204, headers: corsHeaders() });
+    }
+    const handleRequest = async (): Promise<Response> => {
+      const url = new URL(req.url);
+      const requestId = getRequestId(req);
 
     const validation = validateEnv(env);
     if (!validation.ok) {
@@ -205,7 +228,10 @@ export default {
       }
     }
 
-    logEvent("warn", "route.not_found", { requestId, method: req.method, path: url.pathname });
-    return errorResponse("Not Found", requestId, 404);
+      logEvent("warn", "route.not_found", { requestId, method: req.method, path: url.pathname });
+      return errorResponse("Not Found", requestId, 404);
+    };
+    const response = await handleRequest();
+    return withCors(response);
   },
 };

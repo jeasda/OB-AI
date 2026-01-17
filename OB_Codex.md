@@ -514,3 +514,18 @@ Interpretation guide
 - `hasRunpodEndpoint=false`: RUNPOD_ENDPOINT missing or misbound
 - `hasR2Binding=false`: R2 binding missing on submit-proxy (safe to be false if only public URL is used)
 - Non-2xx from API `/qwen/image-edit` now returns upstream submit-proxy status/body for 1-pass debugging
+## [2026-01-17 14:21] Phase 1.1 Global CORS Unblock
+
+Root cause
+- API worker responses lacked `Access-Control-Allow-Origin`, so browser blocked `/qwen/image-edit` before any backend logic ran.
+
+Headers added (global)
+- `Access-Control-Allow-Origin: *`
+- `Access-Control-Allow-Methods: GET, POST, OPTIONS`
+- `Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With`
+
+Phase 1.1 only
+- CORS is intentionally permissive for internal loop verification; tighten after Phase 1.1.
+
+How to lock down later
+- Replace wildcard origin with allowlist and restrict methods/headers in `src/index.ts` (`corsHeaders()`).
