@@ -501,3 +501,16 @@ How to verify Phase 1.1 works
 - Frontend: click Generate at `https://ob-ai.pages.dev/frontend/services/qwen-image-edit` and confirm no 401 in console.
 - API logs: `API_RECEIVED` then `API_FORWARD_TO_PROXY` for `/qwen/image-edit`.
 - Submit-proxy logs: `SUBMIT_PROXY_RECEIVED` after submit.
+## [2026-01-17 14:13] Phase 1.1 Debug Visibility
+
+Endpoints added
+- Submit-proxy `GET /debug/env` returns safe flags only: `service`, `hasRunpodKey`, `hasRunpodEndpoint`, `hasR2Binding`, `version`, `ts`
+
+How to check /debug/env
+- `curl -s https://ob-ai-submit-proxy.legacy-project.workers.dev/debug/env`
+
+Interpretation guide
+- `hasRunpodKey=false`: RUNPOD_API_KEY secret missing on submit-proxy
+- `hasRunpodEndpoint=false`: RUNPOD_ENDPOINT missing or misbound
+- `hasR2Binding=false`: R2 binding missing on submit-proxy (safe to be false if only public URL is used)
+- Non-2xx from API `/qwen/image-edit` now returns upstream submit-proxy status/body for 1-pass debugging

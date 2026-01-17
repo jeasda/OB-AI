@@ -4,6 +4,7 @@ type Env = {
   RUNPOD_API_KEY: string
   RUNPOD_ENDPOINT: string
   RUNPOD_API_BASE?: string
+  R2_RESULTS?: R2Bucket
   R2_PUBLIC_BASE?: string
   R2_PREFIX?: string
   ENVIRONMENT?: string
@@ -344,10 +345,10 @@ export default {
 
       if (req.method === 'GET' && url.pathname === '/debug/env') {
         return json({
-          ok: true,
+          service: 'submit-proxy',
           hasRunpodKey: !!env.RUNPOD_API_KEY,
           hasRunpodEndpoint: !!env.RUNPOD_ENDPOINT,
-          hasR2Binding: !!env.R2_PUBLIC_BASE,
+          hasR2Binding: !!env.R2_RESULTS,
           version: VERSION,
           ts: new Date().toISOString()
         })

@@ -145,38 +145,44 @@ async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
         timestamp: new Date().toISOString(),
         attempt,
       });
-      const proxyRes = await submitProxyFetch(env, jobId, "/submit", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-request-id": jobId,
-          "x-ob-source": "worker",
-        },
-        body: JSON.stringify(runpodPayload),
-      });
-      const proxyText = await proxyRes.text();
-      logEvent("info", "API_PROXY_RESPONSE", {
-        requestId: jobId,
-        status: proxyRes.status,
+      logEvent("info", "SUBMIT_PROXY_CALL_ATTEMPT", {
+        trace_id: jobId,
+        url: `${submitProxyBase}/submit`,
         timestamp: new Date().toISOString(),
-        bodyPreview: proxyText.slice(0, 256),
+      });
+      let proxyRes: Response;
+      try {
+        proxyRes = await submitProxyFetch(env, jobId, "/submit", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-request-id": jobId,
+            "x-ob-source": "worker",
+          },
+          body: JSON.stringify(runpodPayload),
+        });
+      } catch (error: any) {
+        const fetchError: any = new Error(`FETCH_TO_SUBMIT_PROXY_FAILED: ${error?.message || "unknown error"}`);
+        fetchError.fetchFailed = true;
+        throw fetchError;
+      }
+      const proxyText = await proxyRes.text();
+      const bodyPreview = proxyText.slice(0, 2048);
+      logEvent("info", "SUBMIT_PROXY_RESPONSE", {
+        trace_id: jobId,
+        status: proxyRes.status,
+        bodyPreview,
+        timestamp: new Date().toISOString(),
       });
       if (!proxyRes.ok) {
-        const detail = proxyText || `status ${proxyRes.status}`;
-        const error: any = new Error(`Submit proxy failed: ${detail}`);
-        if (proxyRes.status === 401) {
-          logEvent("warn", "API_PROXY_AUTH_401", {
-            requestId: jobId,
+        return {
+          proxyResponse: new Response(proxyText, {
             status: proxyRes.status,
-            bodyPreview: proxyText.slice(0, 256),
-            timestamp: new Date().toISOString(),
-          });
-          error.status = 502;
-        } else {
-          error.status = proxyRes.status;
-        }
-        error.proxyBody = proxyText.slice(0, 512);
-        throw error;
+            headers: {
+              "content-type": proxyRes.headers.get("content-type") || "application/json",
+            },
+          }),
+        };
       }
       const proxyJson = JSON.parse(proxyText);
       runpodId = proxyJson?.runpodRequestId || proxyJson?.jobId || null;
@@ -209,6 +215,7 @@ async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
     runpod_request_id: runpodId,
     timestamp: new Date().toISOString(),
   });
+  return { runpodId };
 }
 
 export async function handleQwenImageEdit(req: Request, env: Env, ctx: ExecutionContext) {
@@ -244,7 +251,15 @@ export async function handleQwenImageEdit(req: Request, env: Env, ctx: Execution
     const job = await createQwenJob(env);
     logEvent("info", "qwen.job.created", { jobId: job.jobId, created_at_ms: Date.now() });
     try {
-      await processJob(env, job.jobId, payload);
+      const result = await processJob(env, job.jobId, payload);
+      if ((result as any)?.proxyResponse) {
+        await updateQwenJob(env, job.jobId, {
+          status: "error",
+          progress: 0,
+          error: "Submit proxy error",
+        });
+        return (result as any).proxyResponse;
+      }
       return jsonResponse(
         { job_id: job.jobId, status: "submitted" },
         { status: 200, headers: corsHeaders() }
@@ -255,6 +270,16 @@ export async function handleQwenImageEdit(req: Request, env: Env, ctx: Execution
         progress: 0,
         error: error?.message || "generation failed",
       });
+      if (error?.fetchFailed) {
+        return jsonResponse(
+          {
+            error: "FETCH_TO_SUBMIT_PROXY_FAILED",
+            details: error?.message || "submit proxy fetch failed",
+            requestId,
+          },
+          { status: 502, headers: corsHeaders() }
+        );
+      }
       const status = typeof error?.status === "number" ? error.status : 502;
       return jsonResponse(
         {
