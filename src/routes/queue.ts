@@ -8,6 +8,7 @@ import { getPublicUrl } from "../services/r2.service";
 import { buildWorkflow } from "../services/workflow.builder";
 import { validateWorkflowContractV1, buildWorkflowContext } from "../lib/workflow_contract";
 import { updateJobTimestamp } from "../services/job_timestamps.service";
+import { getSubmitProxyBase, submitProxyFetch } from "../utils/submitProxy";
 
 type CreateBody = {
   prompt: string;
@@ -134,9 +135,7 @@ export async function handleQueueCreate(req: Request, env: Env) {
 
   try {
     const mode = env.RUNPOD_MODE || "workflow";
-    if (!env.SUBMIT_PROXY_URL) {
-      throw new Error("SUBMIT_PROXY_URL is not set");
-    }
+    const submitProxyBase = getSubmitProxyBase(env, requestId);
 
     if (body.imageFile) {
       if (!env.R2_RESULTS) {
@@ -193,8 +192,7 @@ export async function handleQueueCreate(req: Request, env: Env) {
         },
         imageName
       );
-      const submitUrl = new URL(env.SUBMIT_PROXY_URL);
-      submitUrl.pathname = "/submit";
+      const submitUrl = `${submitProxyBase}/submit`;
       const input = {
         r2_key: key,
         prompt: body.prompt,
@@ -206,13 +204,13 @@ export async function handleQueueCreate(req: Request, env: Env) {
       logEvent("info", "API_FORWARD_TO_SUBMIT_PROXY", {
         requestId,
         trace_id: requestId,
-        url: submitUrl.toString(),
+        url: submitUrl,
         timestamp: new Date().toISOString(),
       });
       let proxyRes: Response;
       let proxyText = "";
       try {
-        proxyRes = await fetch(submitUrl.toString(), {
+        proxyRes = await submitProxyFetch(env, requestId, "/submit", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -283,13 +281,13 @@ export async function handleQueueCreate(req: Request, env: Env) {
     logEvent("info", "API_FORWARD_TO_SUBMIT_PROXY", {
       requestId,
       trace_id: requestId,
-      url: `${env.SUBMIT_PROXY_URL.replace(/\/$/, "")}/submit`,
+      url: `${submitProxyBase}/submit`,
       timestamp: new Date().toISOString(),
     });
     let proxyRes: Response;
     let proxyText = "";
     try {
-      proxyRes = await fetch(`${env.SUBMIT_PROXY_URL.replace(/\/$/, "")}/submit`, {
+      proxyRes = await submitProxyFetch(env, requestId, "/submit", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -426,3 +426,59 @@ Status
 - Pages production should now deploy from main with Vite-built frontend.
 
 Phase 3 is production-live and approved.
+## [2026-01-17 13:56] Phase 1.1 RunPod Job Creation Unblock
+
+What changed
+- submit-proxy: `submit-proxy/src/index.ts`, `submit-proxy/wrangler.toml`
+- API worker: `src/index.ts`, `src/routes/qwen.image-edit.ts`, `src/routes/queue.create.ts`, `src/routes/queue.ts`, `src/routes/runpod-poll.ts`, `src/routes/jobs.status.ts`, `src/utils/submitProxy.ts`, `src/env.ts`, `src/env.d.ts`, `src/types.ts`
+- Infra config: `wrangler.toml`
+- Ops scripts: `scripts/verify_submit_proxy.cmd`, `scripts/verify_runpod_key.cmd`, `scripts/set_submit_proxy_secret.cmd`
+- Tooling: `package.json`, `package-lock.json` (wrangler v4 upgrade)
+
+Required secrets (names only)
+- RUNPOD_API_KEY (submit-proxy)
+
+Secret setup commands
+- `npx wrangler secret put RUNPOD_API_KEY --config submit-proxy/wrangler.toml --env production`
+- `cmd /c scripts\set_submit_proxy_secret.cmd` (requires `RUNPOD_API_KEY` in environment)
+
+Exact verification steps
+- `cmd /c scripts\verify_submit_proxy.cmd`
+- `cmd /c scripts\verify_runpod_key.cmd`
+- `powershell -NoProfile -Command "$payloadPath = Join-Path $env:TEMP 'submit-proxy-test.json'; '{\"prompt\":\"test\",\"r2_key\":\"results/qwen-image-edit/test.png\",\"ratio\":\"9:16\",\"service\":\"qwen-image-edit\"}' | Set-Content -Path $payloadPath -NoNewline; curl.exe -i -X POST \"https://ob-ai-submit-proxy.legacy-project.workers.dev/submit\" -H \"Content-Type: application/json\" --data-binary \"@$payloadPath\""`
+- `curl -i -X POST "https://ob-ai-api.legacy-project.workers.dev/qwen/image-edit" -F "image=@tiny.png" -F "prompt=change her outfit color to blue, editorial look, soft contrast" -F "ratio=9:16" -F "model=qwen-image" -F "service=qwen-image-edit" -F "options={}"`
+
+Verification outputs (sanitized)
+- `scripts/verify_submit_proxy.cmd`:
+```
+[health]
+{"status":"ok"}
+[debug/env]
+{"ok":true,"hasRunpodKey":true,"hasRunpodEndpoint":true,"hasR2Binding":true,"version":"2026-01-17","ts":"2026-01-17T06:40:57.222Z"}
+
+hasRunpodKey: true 
+hasRunpodEndpoint: true 
+hasR2Binding: true 
+```
+- `scripts/verify_runpod_key.cmd`:
+```
+RunPod key failed (401).
+```
+- Submit-proxy `/submit`:
+```
+HTTP/1.1 401 Unauthorized
+{"error":"RUNPOD_RESPONSE_ERROR","message":"RunPod API error"}
+```
+- API `/qwen/image-edit`:
+```
+HTTP/1.1 401 Unauthorized
+{"error":"Submit proxy failed: {\"error\":\"RUNPOD_RESPONSE_ERROR\",\"message\":\"RunPod API error\"}","proxyBody":"{\"error\":\"RUNPOD_RESPONSE_ERROR\",\"message\":\"RunPod API error\"}"}
+```
+
+How to confirm RunPod job appears
+- Trigger Generate in the production UI: https://ob-ai.pages.dev/frontend/services/qwen-image-edit
+- Verify submit-proxy logs show `SUBMIT_PROXY_RECEIVED -> RUNPOD_SUBMIT_ATTEMPT -> NEW_JOB_SUBMITTED` with `runpod_job_id`
+- Confirm a new job appears immediately in the RunPod dashboard with matching timestamp
+
+Known remaining risks
+- RunPod API currently returns 401 Unauthorized for the configured RUNPOD_API_KEY, blocking job creation.

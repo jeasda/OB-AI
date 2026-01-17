@@ -3,6 +3,7 @@ import { jsonResponse } from "../utils/http";
 import { getQwenJob, updateQwenJob } from "../services/qwen_jobs.service";
 import { getPublicUrlForKey, putPngBytesWithKey } from "../services/r2.service";
 import { logEvent } from "../utils/log";
+import { getSubmitProxyBase, submitProxyFetch } from "../utils/submitProxy";
 
 function corsHeaders() {
   return {
@@ -40,26 +41,20 @@ export async function handleJobStatus(req: Request, env: Env, jobId: string) {
 
   if (job.runpodId) {
     try {
-      if (!env.SUBMIT_PROXY_URL) {
-        throw new Error("SUBMIT_PROXY_URL is not set");
-      }
+      const submitProxyBase = getSubmitProxyBase(env, jobId);
       logEvent("info", "JOB_STATUS_POLL", {
         jobId,
         runpodId: job.runpodId,
-        endpoint: env.SUBMIT_PROXY_URL,
+        endpoint: submitProxyBase,
         timestamp: new Date().toISOString(),
       });
-      const proxyRes = await fetch(
-        `${env.SUBMIT_PROXY_URL.replace(/\/$/, "")}/status/${encodeURIComponent(job.runpodId)}`,
-        {
-          headers: {
-            Authorization: env.RUNPOD_API_KEY ? `Bearer ${env.RUNPOD_API_KEY}` : "",
-          },
-        }
-      );
+      const proxyRes = await submitProxyFetch(env, jobId, `/status/${encodeURIComponent(job.runpodId)}`);
       const proxyText = await proxyRes.text();
       if (!proxyRes.ok) {
-        throw new Error(proxyText || "Submit proxy status failed");
+        const error: any = new Error(proxyText || "Submit proxy status failed");
+        error.status = proxyRes.status;
+        error.proxyBody = proxyText.slice(0, 512);
+        throw error;
       }
       const proxyJson = JSON.parse(proxyText);
       const run = proxyJson?.status;

@@ -2,6 +2,7 @@ import type { Env } from "../env";
 import { extractOutputImageUrl } from "../services/runpod_helpers";
 import { errorResponse, getRequestId, okResponse } from "../utils/http";
 import { logEvent } from "../utils/log";
+import { getSubmitProxyBase, submitProxyFetch } from "../utils/submitProxy";
 
 export async function handlePoll(
   req: Request,
@@ -16,23 +17,17 @@ export async function handlePoll(
     return errorResponse("Missing jobId", requestId, 400);
   }
 
-  if (!env.SUBMIT_PROXY_URL) {
-    return errorResponse("SUBMIT_PROXY_URL is not set", requestId, 500);
-  }
+  const submitProxyBase = getSubmitProxyBase(env, requestId);
   logEvent("info", "JOB_STATUS_POLL", {
     requestId,
     job_id: jobId,
-    endpoint: env.SUBMIT_PROXY_URL,
+    endpoint: submitProxyBase,
     timestamp: new Date().toISOString(),
   });
-  const proxyRes = await fetch(`${env.SUBMIT_PROXY_URL.replace(/\/$/, "")}/status/${encodeURIComponent(jobId)}`, {
-    headers: {
-      Authorization: env.RUNPOD_API_KEY ? `Bearer ${env.RUNPOD_API_KEY}` : "",
-    },
-  });
+  const proxyRes = await submitProxyFetch(env, requestId, `/status/${encodeURIComponent(jobId)}`);
   const proxyText = await proxyRes.text();
   if (!proxyRes.ok) {
-    return errorResponse(proxyText || "Submit proxy failed", requestId, 502);
+    return errorResponse(proxyText || "Submit proxy failed", requestId, proxyRes.status);
   }
   const proxyJson = JSON.parse(proxyText);
   const status = proxyJson?.status;

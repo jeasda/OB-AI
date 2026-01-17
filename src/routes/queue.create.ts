@@ -1,7 +1,7 @@
 import type { Env } from "../env";
 import { errorResponse, getRequestId, okResponse } from "../utils/http";
 import { logEvent } from "../utils/log";
-import { logEvent } from "../utils/log";
+import { getSubmitProxyBase, submitProxyFetch } from "../utils/submitProxy";
 
 export async function handleQueueCreate(req: Request, env: Env) {
   const requestId = getRequestId(req);
@@ -22,25 +22,22 @@ export async function handleQueueCreate(req: Request, env: Env) {
   }
 
   try {
-    if (!env.SUBMIT_PROXY_URL) {
-      return errorResponse("SUBMIT_PROXY_URL is not set", requestId, 500);
-    }
+    const submitProxyBase = getSubmitProxyBase(env, requestId);
     logEvent("info", "FORWARDING_TO_SUBMIT_PROXY", {
       requestId,
-      endpoint: env.SUBMIT_PROXY_URL,
+      endpoint: submitProxyBase,
       timestamp: new Date().toISOString(),
     });
-    const proxyRes = await fetch(`${env.SUBMIT_PROXY_URL.replace(/\/$/, "")}/submit`, {
+    const proxyRes = await submitProxyFetch(env, requestId, "/submit", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: env.RUNPOD_API_KEY ? `Bearer ${env.RUNPOD_API_KEY}` : "",
       },
       body: JSON.stringify({ prompt, ratio, model }),
     });
     const proxyText = await proxyRes.text();
     if (!proxyRes.ok) {
-      return errorResponse(proxyText || "Submit proxy failed", requestId, 502);
+      return errorResponse(proxyText || "Submit proxy failed", requestId, proxyRes.status);
     }
     const proxyJson = JSON.parse(proxyText);
     logEvent("info", "queue.create.submitted", { requestId, runpod_id: proxyJson?.runpodRequestId });

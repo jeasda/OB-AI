@@ -11,6 +11,7 @@ type Env = {
 
 const RUNPOD_TIMEOUT_MS = 60_000
 const RUNPOD_RETRIES = 2
+const VERSION = '2026-01-17'
 let lastJob: {
   requestId: string
   timestamp: string
@@ -126,7 +127,7 @@ async function submitToRunPod(env: Env, payload: Record<string, unknown>, reques
     return {
       error: 'RUNPOD_API_KEY_MISSING',
       message: 'Submit Proxy is not configured with RUNPOD_API_KEY',
-      status: 502
+      status: 500
     }
   }
   if (!env.RUNPOD_ENDPOINT) {
@@ -287,7 +288,7 @@ async function getRunPodStatus(env: Env, runpodId: string) {
     return {
       error: 'RUNPOD_API_KEY_MISSING',
       message: 'Submit Proxy is not configured with RUNPOD_API_KEY',
-      status: 502
+      status: 500
     }
   }
   if (!env.RUNPOD_ENDPOINT) {
@@ -338,15 +339,17 @@ export default {
 
     try {
       if (req.method === 'GET' && url.pathname === '/health') {
-        return json({ ok: true, service: 'submit-proxy', timestamp: new Date().toISOString() })
+        return json({ status: 'ok' })
       }
 
       if (req.method === 'GET' && url.pathname === '/debug/env') {
         return json({
           ok: true,
           hasRunpodKey: !!env.RUNPOD_API_KEY,
-          endpoint: env.RUNPOD_ENDPOINT ?? '',
-          hasR2PublicBase: !!env.R2_PUBLIC_BASE
+          hasRunpodEndpoint: !!env.RUNPOD_ENDPOINT,
+          hasR2Binding: !!env.R2_PUBLIC_BASE,
+          version: VERSION,
+          ts: new Date().toISOString()
         })
       }
 
@@ -365,6 +368,7 @@ export default {
         emitLog('SUBMIT_PROXY_RECEIVED', {
           timestamp: new Date().toISOString(),
           requestId,
+          trace_id: requestId,
           path: url.pathname,
           source
         })

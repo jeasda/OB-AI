@@ -4,7 +4,7 @@ export interface Env {
   R2_RESULTS: R2Bucket;
   R2_PREFIX: string;
   R2_PUBLIC_BASE?: string;
-  RUNPOD_API_KEY: string;
+  RUNPOD_API_KEY?: string;
   RUNPOD_ENDPOINT: string;
   RUNPOD_MODE?: "workflow" | "prompt";
   RUNPOD_WEBHOOK_SECRET?: string;
@@ -15,4 +15,5 @@ export interface Env {
   COST_PER_JOB_USD?: string;
   ENVIRONMENT?: string;
   SUBMIT_PROXY_URL?: string;
+  SUBMIT_PROXY?: Fetcher;
 }

@@ -6,6 +6,7 @@ import { errorResponse, getRequestId, okResponse } from "./utils/http";
 import { logEvent } from "./utils/log";
 import { handleQwenImageEdit } from "./routes/qwen.image-edit";
 import { handleJobStatus } from "./routes/jobs.status";
+import { getSubmitProxyBase, submitProxyFetch } from "./utils/submitProxy";
 
 type EnvValidation = { ok: true } | { ok: false; error: string; missing?: string[] };
 
@@ -32,7 +33,6 @@ function validateEnv(env: Env): EnvValidation {
 
   const missing: string[] = [];
     if (production || !mockMode) {
-      if (!env.RUNPOD_API_KEY) missing.push("RUNPOD_API_KEY");
       if (!env.RUNPOD_ENDPOINT) missing.push("RUNPOD_ENDPOINT");
       if (!env.R2_PREFIX) missing.push("R2_PREFIX");
       if (!env.R2_PUBLIC_BASE) missing.push("R2_PUBLIC_BASE");
@@ -103,12 +103,15 @@ export default {
       return handleJobStatus(req, env, jobId);
     }
     if (req.method === "GET" && url.pathname === "/debug/submit-proxy-ping") {
-      if (!env.SUBMIT_PROXY_URL) {
-        return errorResponse("SUBMIT_PROXY_URL is not set", requestId, 500);
+      let submitProxyBase: string;
+      try {
+        submitProxyBase = getSubmitProxyBase(env, requestId);
+      } catch (error: any) {
+        return errorResponse(error?.message || "SUBMIT_PROXY_URL is not set", requestId, 500);
       }
       try {
-        const healthUrl = `${env.SUBMIT_PROXY_URL.replace(/\/$/, "")}/health`;
-        const res = await fetch(healthUrl);
+        const healthUrl = `${submitProxyBase}/health`;
+        const res = await submitProxyFetch(env, requestId, "/health");
         const text = await res.text();
         logEvent("info", "SUBMIT_PROXY_PING_RESULT", {
           requestId,
@@ -130,13 +133,15 @@ export default {
       return okResponse({ ok: true, ts: new Date().toISOString(), env: env.ENVIRONMENT || "production" }, requestId);
     }
     if (req.method === "GET" && url.pathname === "/debug/submit-proxy") {
-      if (!env.SUBMIT_PROXY_URL) {
-        return errorResponse("SUBMIT_PROXY_URL is not set", requestId, 500);
+      let submitProxyBase: string;
+      try {
+        submitProxyBase = getSubmitProxyBase(env, requestId);
+      } catch (error: any) {
+        return errorResponse(error?.message || "SUBMIT_PROXY_URL is not set", requestId, 500);
       }
       try {
-        const healthUrl = new URL(env.SUBMIT_PROXY_URL);
-        healthUrl.pathname = "/health";
-        const res = await fetch(healthUrl.toString());
+        const healthUrl = `${submitProxyBase}/health`;
+        const res = await submitProxyFetch(env, requestId, "/health");
         const text = await res.text();
         logEvent("info", "SUBMIT_PROXY_PING_RESULT", {
           requestId,
@@ -170,8 +175,11 @@ export default {
       );
     }
     if (req.method === "POST" && url.pathname === "/debug/submit-proxy") {
-      if (!env.SUBMIT_PROXY_URL) {
-        return errorResponse("SUBMIT_PROXY_URL is not set", requestId, 500);
+      let submitProxyBase: string;
+      try {
+        submitProxyBase = getSubmitProxyBase(env, requestId);
+      } catch (error: any) {
+        return errorResponse(error?.message || "SUBMIT_PROXY_URL is not set", requestId, 500);
       }
       let payload: Record<string, unknown> = { r2_key: "debug/placeholder.png", prompt: "ping", service: "qwen-image-edit" };
       try {
@@ -181,9 +189,8 @@ export default {
         // ignore and use default payload
       }
       try {
-        const submitUrl = new URL(env.SUBMIT_PROXY_URL);
-        submitUrl.pathname = "/submit";
-        const res = await fetch(submitUrl.toString(), {
+        const submitUrl = `${submitProxyBase}/submit`;
+        const res = await submitProxyFetch(env, requestId, "/submit", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

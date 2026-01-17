@@ -23,3 +23,8 @@ bucket_name = "ob-ai-results"
 [[env.production.r2_buckets]]
 binding = "RESULTS_BUCKET"
 bucket_name = "ob-ai-results"
+
+[[env.production.services]]
+binding = "SUBMIT_PROXY"
+service = "ob-ai-submit-proxy"
+environment = "production"

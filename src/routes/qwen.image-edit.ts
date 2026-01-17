@@ -1,12 +1,12 @@
 import type { Env } from "../env";
 import { getRequestId, jsonResponse } from "../utils/http";
 import { createQwenJob, updateQwenJob } from "../services/qwen_jobs.service";
-import { getPublicUrlForKey, putPngBytesWithKey } from "../services/r2.service";
 import { logEvent } from "../utils/log";
-import { buildWorkflow } from "../services/workflow.builder";
+import { getSubmitProxyBase, submitProxyFetch } from "../utils/submitProxy";
 
 type ParsedRequest = {
   image: Uint8Array;
+  imageType?: string;
   prompt: string;
   presets: string[];
   options: Record<string, unknown>;
@@ -29,16 +29,6 @@ function decodeBase64Image(raw: string) {
     bytes[i] = binary.charCodeAt(i);
   }
   return bytes;
-}
-
-function uint8ToBase64(bytes: Uint8Array) {
-  let binary = "";
-  const chunk = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunk) {
-    const slice = bytes.subarray(i, i + chunk);
-    binary += String.fromCharCode(...slice);
-  }
-  return btoa(binary);
 }
 
 function normalizePresets(value: unknown) {
@@ -67,6 +57,7 @@ async function parseRequest(request: Request): Promise<ParsedRequest> {
     const image = body?.image ? decodeBase64Image(String(body.image)) : null;
     return {
       image,
+      imageType: typeof body?.image_type === "string" ? body.image_type : "image/png",
       prompt: String(body?.prompt || ""),
       presets: normalizePresets(body?.presets),
       options: body?.options && typeof body.options === "object" ? body.options : {},
@@ -91,6 +82,7 @@ async function parseRequest(request: Request): Promise<ParsedRequest> {
 
   return {
     image,
+    imageType: file instanceof File ? file.type : "image/png",
     prompt: String(formData.get("prompt") || ""),
     presets,
     options,
@@ -101,29 +93,47 @@ async function parseRequest(request: Request): Promise<ParsedRequest> {
 async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
   const { image, prompt } = payload;
   await updateQwenJob(env, jobId, { status: "processing", progress: 20 });
-
-  const imageName = `input-${jobId}.png`;
-  const { workflow } = buildWorkflow(
-    {
-      prompt,
-      ratio: "9:16",
-      model: "qwen-image",
+  if (!env.R2_RESULTS) {
+    throw new Error("R2_RESULTS is not set");
+  }
+  const imageType = payload.imageType || "image/png";
+  const ext = imageType.includes("jpeg") || imageType.includes("jpg")
+    ? "jpg"
+    : imageType.includes("png")
+      ? "png"
+      : "bin";
+  const datePrefix = new Date().toISOString().slice(0, 10);
+  const key = `${env.R2_PREFIX || "results"}/qwen-image-edit/${datePrefix}/${jobId}.${ext}`;
+  logEvent("info", "R2_UPLOAD_START", {
+    requestId: jobId,
+    key,
+    contentType: imageType,
+    bytes: image.length,
+    timestamp: new Date().toISOString(),
+  });
+  await env.R2_RESULTS.put(key, image, {
+    httpMetadata: {
+      contentType: imageType || "application/octet-stream",
     },
-    imageName
-  );
+  });
+  logEvent("info", "R2_UPLOAD_OK", {
+    requestId: jobId,
+    key,
+    bytes: image.length,
+    timestamp: new Date().toISOString(),
+  });
 
-  const imageBase64 = uint8ToBase64(image);
   const runpodPayload = {
-    workflow,
-    images: [{ name: imageName, image: imageBase64 }],
+    r2_key: key,
+    prompt,
+    ratio: "9:16",
     service: "qwen-image-edit",
+    requestId: jobId,
   };
 
   let runpodId: string | null = null;
   let lastError: any = null;
-  if (!env.SUBMIT_PROXY_URL) {
-    throw new Error("SUBMIT_PROXY_URL is not set");
-  }
+  const submitProxyBase = getSubmitProxyBase(env, jobId);
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
       logEvent("info", "API_RECEIVED", {
@@ -131,17 +141,16 @@ async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
         timestamp: new Date().toISOString(),
       });
       logEvent("info", "API_FORWARD_TO_PROXY", {
-        endpoint: env.SUBMIT_PROXY_URL,
+        endpoint: submitProxyBase,
         timestamp: new Date().toISOString(),
         attempt,
       });
-      const proxyRes = await fetch(`${env.SUBMIT_PROXY_URL.replace(/\/$/, "")}/submit`, {
+      const proxyRes = await submitProxyFetch(env, jobId, "/submit", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "x-request-id": jobId,
           "x-ob-source": "worker",
-          Authorization: env.RUNPOD_API_KEY ? `Bearer ${env.RUNPOD_API_KEY}` : "",
         },
         body: JSON.stringify(runpodPayload),
       });
@@ -154,7 +163,10 @@ async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
       });
       if (!proxyRes.ok) {
         const detail = proxyText || `status ${proxyRes.status}`;
-        throw new Error(`Submit proxy failed: ${detail}`);
+        const error: any = new Error(`Submit proxy failed: ${detail}`);
+        error.status = proxyRes.status;
+        error.proxyBody = proxyText.slice(0, 512);
+        throw error;
       }
       const proxyJson = JSON.parse(proxyText);
       runpodId = proxyJson?.runpodRequestId || proxyJson?.jobId || null;
@@ -164,7 +176,7 @@ async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
       logEvent("error", "API_ERROR", {
         errorMessage: error?.message || "submit proxy failed",
         stack: error?.stack,
-        endpoint: env.SUBMIT_PROXY_URL,
+        endpoint: submitProxyBase,
         timestamp: new Date().toISOString(),
       });
       if (attempt < 3) {
@@ -173,7 +185,8 @@ async function processJob(env: Env, jobId: string, payload: ParsedRequest) {
     }
   }
   if (!runpodId) {
-    throw new Error(lastError?.message || "Submit proxy failed");
+    if (lastError) throw lastError;
+    throw new Error("Submit proxy failed");
   }
 
   await updateQwenJob(env, jobId, {
@@ -218,9 +231,14 @@ export async function handleQwenImageEdit(req: Request, env: Env, ctx: Execution
         progress: 0,
         error: error?.message || "generation failed",
       });
+      const status = typeof error?.status === "number" ? error.status : 502;
       return jsonResponse(
-        { error: error?.message || "generation failed", requestId },
-        { status: 502, headers: corsHeaders() }
+        {
+          error: error?.message || "generation failed",
+          requestId,
+          proxyBody: error?.proxyBody || null,
+        },
+        { status, headers: corsHeaders() }
       );
     }
   } catch (error: any) {
